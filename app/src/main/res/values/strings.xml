@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Vehicle Call Alert</string>
+    <string name="app_description">Call vehicle owner via QR — no phone number exposed. Privacy-first, HD Voice via WebRTC.</string>
+</resources>
