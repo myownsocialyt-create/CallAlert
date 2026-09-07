@@ -65,6 +65,8 @@ android {
     }
 
     lint {
+        // Newer library versions require compileSdk 37 / AGP 9; see the dependency block.
+        disable 'GradleDependency'
         abortOnError false
         checkReleaseBuilds true
         warningsAsErrors false
@@ -74,9 +76,13 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.8.0'
-    implementation 'androidx.core:core:1.19.0'
-    implementation 'androidx.activity:activity:1.13.0'
-    implementation 'androidx.webkit:webkit:1.17.0'
-    implementation 'com.google.android.material:material:1.14.0'
+    // Pinned to the newest versions that still build against compileSdk 36.
+    // Newer AndroidX releases (core 1.19+, activity 1.13+, webkit 1.17+, material 1.14+)
+    // require compileSdk 37 and Android Gradle plugin 9.x, while Google Play currently
+    // requires apps to target API 36.
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.google.android.material:material:1.13.0'
 }
