@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF08080A</color>
-    <color name="card">#FF131316</color>
-    <color name="yellow">#FFFACC15</color>
-    <color name="green">#FF22C55E</color>
-    <color name="white">#FFFAFAFA</color>
+    <color name="brand_black">#FF08080A</color>
+    <color name="brand_card">#FF131316</color>
+    <color name="brand_yellow">#FFFACC15</color>
+    <color name="brand_green">#FF22C55E</color>
+    <color name="brand_white">#FFFAFAFA</color>
+
+    <!-- Background behind the WebView, matches the web UI background. -->
+    <color name="app_background">#FFF5F5F4</color>
+    <color name="ic_launcher_background">#FF111114</color>
 </resources>

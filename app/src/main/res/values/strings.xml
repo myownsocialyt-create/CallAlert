@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">Vehicle Call Alert</string>
-    <string name="app_description">Call vehicle owner via QR — no phone number exposed. Privacy-first, HD Voice via WebRTC.</string>
+    <string name="app_description">Let people call a vehicle owner by scanning a QR code — the phone number is never shared. Private HD voice calls over the internet.</string>
+    <string name="mic_permission_rationale">Microphone access is needed so you can talk during a call. Audio is never recorded or stored.</string>
+    <string name="mic_permission_denied">Microphone permission denied. Voice calls will not work until you allow it in Settings.</string>
+    <string name="no_app_to_handle">No app available to open this link.</string>
+    <string name="offline_message">No internet connection. Vehicle Call Alert needs internet to place or receive calls.</string>
+    <string name="retry">Retry</string>
+    <string name="share_title">Share</string>
+    <string name="share_failed">Could not prepare the file for sharing.</string>
 </resources>

@@ -2,11 +2,10 @@
 
     <style name="Theme.VehicleCallAlert" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/app_background</item>
-        <!-- Edge-to-edge is mandatory from Android 15/16; insets are applied in code. -->
         <item name="android:statusBarColor" tools:targetApi="21">@android:color/transparent</item>
         <item name="android:navigationBarColor" tools:targetApi="21">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
         <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
     </style>

@@ -1,284 +1,272 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src https: wss:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Vehicle Call Alert</title>
-<link href="https://fonts.googleapis.com/css2?family=Righteous&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<style>
-:root{--bg:#08080a;--card:#131316;--card2:#1c1c20;--border:#252529;--muted:#9f9fa9;--text:#fafafa;--green:#22c55e;--red:#ef4444;--yellow:#facc15}
-html[data-theme="light"]{--bg:#f5f5f4;--card:#ffffff;--card2:#ececec;--border:#d6d3d1;--muted:#78716c;--text:#1c1917}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .25s,color .25s}
-.app-header{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border);padding:12px 14px;display:flex;align-items:center;gap:12px;backdrop-filter:blur(20px)}
-.menu-btn{width:40px;height:40px;border-radius:12px;background:var(--card2);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.logo{font-family:'Righteous',cursive;font-size:19px;letter-spacing:.02em;display:flex;align-items:center;gap:10px;flex:1}
-.logo-graphic{width:36px;height:36px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;position:relative;border:1px solid var(--border)}
-.logo-graphic svg{width:26px;height:26px}
-.theme-toggle{width:40px;height:40px;border-radius:12px;background:var(--card2);border:1px solid var(--border);cursor:pointer;font-size:16px;color:var(--text)}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:40;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
-.nav-item{flex:1;padding:10px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--muted);cursor:pointer}
-.nav-item.active{color:var(--text)}
-.nav-item span{font-size:20px}
-.container{max-width:480px;margin:0 auto;padding:14px 14px 90px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;margin-bottom:12px;transition:background .25s,border-color .25s}
-.card-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-.plate{display:flex;justify-content:space-between;align-items:center;background:#fff;color:#111;border-radius:12px;padding:10px 12px;margin-bottom:10px;border:2px solid #111}
-.plate b{font-family:'JetBrains Mono';font-size:16px}
-.btn{border:none;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.btn-w{background:#fff;color:#000;border:1px solid #e4e4e7}.btn-g{background:var(--green);color:#000}.btn-r{background:var(--red);color:#fff}.btn-d{background:var(--card2);color:var(--text);border:1px solid var(--border)}.btn-sm{padding:7px 10px;font-size:11px}.btn-full{width:100%}
-.input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:12px;color:var(--text);font-size:14px;outline:none;font-family:'JetBrains Mono';text-transform:uppercase}
-.label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:8px 0 4px;display:block}
-.status-dot{width:10px;height:10px;border-radius:50%;background:#3f3f46;display:inline-block}
-.status-dot.online{background:var(--green);box-shadow:0 0 0 4px rgba(34,197,94,.2)}
-.modal{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:14px}
-.modal.open{display:flex}
-.modal-box{width:100%;max-width:440px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px;max-height:90vh;overflow:auto}
-.sticker{width:100%;background:#fff;color:#111;border-radius:12px;padding:0;overflow:hidden;border:3px solid #111;position:relative}
-.sticker-top{background:#111;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
-.sticker-top h4{font-family:'Righteous';font-size:16px}
-.sticker-top span{background:var(--yellow);color:#111;padding:4px 8px;border-radius:6px;font-size:10px;font-weight:800}
-.sticker-mid{display:flex;gap:12px;padding:14px}
-.sticker-qr img{width:120px;height:120px;border:2px solid #111;border-radius:8px}
-.sticker-info{flex:1}
-.sticker-info b{font-family:'JetBrains Mono';font-size:18px;display:block}
-.sticker-info .big{font-family:'Righteous';font-size:22px;line-height:1;margin:6px 0}
-.sticker-info p{font-size:11px;line-height:1.4;color:#333;margin-top:4px}
-.sticker-bottom{background:var(--yellow);padding:8px 14px;text-align:center;font-weight:800;font-size:11px;letter-spacing:.05em;color:#111}
-.drawer{position:fixed;inset:0;z-index:100;display:none}
-.drawer.open{display:block}
-.drawer-bg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
-.drawer-panel{position:absolute;left:0;top:0;bottom:0;width:300px;background:var(--card);border-right:1px solid var(--border);padding:18px;overflow:auto}
-.drawer-item{padding:11px 12px;border-radius:12px;display:flex;gap:10px;align-items:center;cursor:pointer;font-size:13px;margin-bottom:4px;color:var(--text)}
-.drawer-item:hover{background:var(--card2)}
-.badge{font-size:10px;padding:3px 7px;border-radius:20px;background:var(--card2);border:1px solid var(--border)}
-.timer{font-family:'JetBrains Mono';font-size:11px}
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app-header">
-  <button class="menu-btn" onclick="toggleDrawer()">☰</button>
-  <div class="logo">
-    <div class="logo-graphic">
-      <svg viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4 18 L8 10 L36 10 L40 18 Z" fill="black"/>
-        <path d="M2 18 L4 18 L6 14 L36 14 L38 18 L42 18 L42 22 L2 22 Z" fill="black"/>
-        <circle cx="12" cy="24" r="4" fill="black"/><circle cx="12" cy="24" r="1.5" fill="white"/>
-        <circle cx="32" cy="24" r="4" fill="black"/><circle cx="32" cy="24" r="1.5" fill="white"/>
-        <path d="M38 2 L42 2 L44 5 L44 8 L42 10 L38 10 L36 8 L36 5 Z" fill="#22c55e"/>
-        <path d="M39 10 L41 10 L40.5 12 L39.5 12 Z" fill="#22c55e"/>
+
+<header class="app-header">
+  <button class="icon-btn" id="menuBtn" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 108 108">
+        <path class="wave" d="M69.4,32.8 A10,10 0 0 1 73.2,40.6 L77.2,40.6 A14,14 0 0 0 71.9,29.7 Z"/>
+        <path class="wave" d="M74.6,26.2 A18.4,18.4 0 0 1 81.6,40.6 L85.6,40.6 A22.4,22.4 0 0 0 77.1,23.1 Z"/>
+        <path class="body" d="M24,72 L24,62.5 C24,60.2 25.3,58.2 27.4,57.3 L33.6,54.6 L40.4,46.6 C41.9,44.9 44,44 46.3,44 L63.7,44 C66,44 68.1,44.9 69.6,46.6 L76.4,54.6 L82.6,57.3 C84.7,58.2 86,60.2 86,62.5 L86,72 Z"/>
+        <circle class="dark" cx="37" cy="64" r="8"/><circle class="light" cx="37" cy="64" r="3"/>
+        <circle class="dark" cx="73" cy="64" r="8"/><circle class="light" cx="73" cy="64" r="3"/>
       </svg>
-    </div>
-    VEHICLE CALL ALERT
+    </span>
+    <span class="brand-name">Vehicle Call Alert</span>
   </div>
-  <button class="theme-toggle" onclick="cycleTheme()" id="themeBtn">🌙</button>
-</div>
+  <button class="icon-btn" id="themeBtn" aria-label="Change theme">
+    <svg viewBox="0 0 24 24" aria-hidden="true" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  </button>
+</header>
 
-<div class="drawer" id="drawer">
-  <div class="drawer-bg" onclick="toggleDrawer()"></div>
-  <div class="drawer-panel">
-    <div class="logo" style="margin-bottom:16px">
-      <div class="logo-graphic"><svg viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 18 L8 10 L36 10 L40 18 Z" fill="black"/><path d="M2 18 L4 18 L6 14 L36 14 L38 18 L42 18 L42 22 L2 22 Z" fill="black"/><circle cx="12" cy="24" r="4" fill="black"/><circle cx="32" cy="24" r="4" fill="black"/><path d="M38 2 L42 2 L44 5 L44 8 L42 10 L38 10 L36 8 L36 5 Z" fill="#22c55e"/></svg></div>
-      VEHICLE CALL ALERT
+<nav class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-scrim" data-close-drawer></div>
+  <div class="drawer-panel" role="menu">
+    <div class="drawer-head">
+      <strong>Vehicle Call Alert</strong>
+      <span class="muted small">Version 1.0</span>
     </div>
-    <div class="drawer-item" onclick="showSection('garage');toggleDrawer()">🏠 My Garage</div>
-    <div class="drawer-item" onclick="showSection('call');toggleDrawer()">📞 Call Other Vehicle</div>
-    <div class="drawer-item" onclick="showSection('logs');toggleDrawer()">🕒 Call History</div>
-    <div class="drawer-item" onclick="showSection('howto');toggleDrawer()">📖 How to Use</div>
-    <div class="drawer-item" onclick="showSection('privacy');toggleDrawer()">🔒 Privacy Policy</div>
-    <div class="drawer-item" onclick="showSection('about');toggleDrawer()">ℹ️ About</div>
-    <div class="drawer-item" onclick="showSection('contact');toggleDrawer()">✉️ Contact Support</div>
-    <div style="margin-top:16px;padding:12px;background:var(--card2);border-radius:12px">
-      <p style="font-size:11px;color:var(--muted)">Contact</p>
-      <p style="font-size:12px;font-weight:600;margin-top:4px">DataShield.studio@gmail.com</p>
-      <p style="font-size:10px;color:var(--muted);margin-top:8px">v1.0 (1) • Target SDK 36 • Min 21<br>Play Console Compliant</p>
+    <button class="drawer-item" data-section="garage">My Garage</button>
+    <button class="drawer-item" data-section="call">Call a Vehicle</button>
+    <button class="drawer-item" data-section="logs">Call History</button>
+    <button class="drawer-item" data-section="howto">How to Use</button>
+    <button class="drawer-item" data-section="settings">Settings</button>
+    <button class="drawer-item" data-section="privacy">Privacy Policy</button>
+    <button class="drawer-item" data-section="about">About</button>
+    <div class="drawer-foot">
+      <p class="small muted">Support</p>
+      <p class="small"><a href="mailto:DataShield.studio@gmail.com">DataShield.studio@gmail.com</a></p>
     </div>
   </div>
-</div>
+</nav>
 
-<div class="container">
-  <div id="sec-garage">
+<main class="container">
+
+  <div id="offlineBanner" class="banner hidden" role="status">No internet connection — calls are unavailable.</div>
+
+  <!-- ================= GARAGE ================= -->
+  <section id="sec-garage" class="section">
     <div class="card">
-      <div class="card-title">Add Vehicle <span class="badge" id="vehicleCount">0</span></div>
-      <label class="label">Vehicle Number</label>
-      <input id="newNumber" class="input" placeholder="UP16AB1234" maxlength="15">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-        <div><label class="label">Type</label><select id="newType" class="input" style="text-transform:none"><option value="car">Car</option><option value="bike">Bike</option><option value="truck">Truck</option><option value="auto">Auto</option></select></div>
-        <div><label class="label">Nickname</label><input id="newNick" class="input" placeholder="My Car" style="text-transform:none"></div>
+      <h2 class="card-title">Add a vehicle <span class="badge" id="vehicleCount">0</span></h2>
+      <label class="label" for="newNumber">Vehicle number</label>
+      <input id="newNumber" class="input plate-input" placeholder="UP16AB1234" maxlength="15"
+             autocomplete="off" autocapitalize="characters" inputmode="text">
+      <div class="grid-2">
+        <div>
+          <label class="label" for="newType">Type</label>
+          <select id="newType" class="input">
+            <option value="Car">Car</option>
+            <option value="Bike">Bike</option>
+            <option value="Truck">Truck</option>
+            <option value="Auto">Auto</option>
+            <option value="Bus">Bus</option>
+          </select>
+        </div>
+        <div>
+          <label class="label" for="newNick">Nickname</label>
+          <input id="newNick" class="input" placeholder="My car" maxlength="20" autocomplete="off">
+        </div>
       </div>
-      <button class="btn btn-w btn-full" style="margin-top:10px" onclick="addVehicle()">➕ Add Vehicle</button>
+      <button class="btn btn-primary btn-full" id="addVehicleBtn">Add vehicle</button>
+      <p class="small muted mt8">Vehicle details stay on this device only.</p>
     </div>
 
     <div id="vehicleList"></div>
 
-    <div class="card" id="globalStatusCard" style="display:none">
-      <div class="card-title">Live Status <span class="timer" id="globalTimer">00:00</span></div>
-      <div id="globalStatus" style="font-size:13px">Connecting...</div>
-      <audio id="remoteAudio" autoplay playsinline></audio>
-    </div>
-
     <div class="card">
-      <div class="card-title">Recent Calls <button class="btn btn-d btn-sm" onclick="showSection('logs')">View All</button></div>
+      <h2 class="card-title">Recent calls <button class="btn btn-ghost btn-sm" data-section="logs">View all</button></h2>
       <div id="homeLogs"></div>
     </div>
-  </div>
+  </section>
 
-  <div id="sec-call" style="display:none">
+  <!-- ================= CALL ================= -->
+  <section id="sec-call" class="section hidden">
     <div class="card">
-      <div class="card-title">Call Other Vehicle</div>
-      <label class="label">Enter Vehicle Number</label>
-      <input id="callNumber" class="input" placeholder="UP16AB1234">
-      <button class="btn btn-g btn-full" style="margin-top:10px" onclick="callOther()">📞 Call Now</button>
-      <div id="callStatus" style="margin-top:10px;padding:10px;background:var(--card2);border-radius:10px;display:none;font-size:12px"></div>
-      <div style="display:none;gap:8px;margin-top:10px" id="callControls">
-        <button class="btn btn-d" style="flex:1" onclick="toggleMute()">🎙️ Mute</button>
-        <button class="btn btn-r" style="flex:1" onclick="endCall()">End</button>
-      </div>
-      <audio id="callAudio" autoplay playsinline></audio>
+      <h2 class="card-title">Call a vehicle owner</h2>
+      <label class="label" for="callNumber">Vehicle number</label>
+      <input id="callNumber" class="input plate-input" placeholder="UP16AB1234" maxlength="15"
+             autocomplete="off" autocapitalize="characters">
+      <button class="btn btn-success btn-full" id="callBtn">Call now</button>
+      <p class="small muted mt8">The owner's phone number is never shown. The call runs over the internet.</p>
     </div>
-  </div>
+  </section>
 
-  <div id="sec-logs" style="display:none">
-    <div class="card"><div class="card-title">Call History <button class="btn btn-d btn-sm" onclick="clearLogs()">Clear</button></div><div id="logList"></div></div>
-  </div>
-
-  <div id="sec-howto" style="display:none"><div class="card"><h3>How to Use</h3><ol style="padding-left:18px;font-size:13px;line-height:1.7;color:var(--muted);margin-top:8px"><li>Add vehicle</li><li>Go Online - stays until Offline or uninstall, auto after reboot</li><li>Windshield Card - professional yellow/black highly visible</li><li>Download JPG/PDF/Print and stick</li><li>Scan QR → call via internet, no number shown</li></ol></div></div>
-  <div id="sec-privacy" style="display:none"><div class="card"><h3>Privacy Policy</h3><p style="font-size:12px;line-height:1.6;color:var(--muted);margin-top:8px">No data collection. Numbers stored locally. P2P encrypted. Contact: DataShield.studio@gmail.com<br>Target 36, Min 21.</p></div></div>
-  <div id="sec-about" style="display:none"><div class="card"><h3 style="font-family:Righteous">VEHICLE CALL ALERT</h3><p style="font-size:12px;color:var(--muted);margin-top:8px">v1.0 (1) • First Play Store Release<br>Target SDK 36 • Min 21<br>Contact: DataShield.studio@gmail.com</p></div></div>
-  <div id="sec-contact" style="display:none"><div class="card"><h3>Contact Support</h3><p style="font-size:13px;margin-top:8px">Email: <b>DataShield.studio@gmail.com</b></p><button class="btn btn-w" style="margin-top:10px" onclick="window.open('mailto:DataShield.studio@gmail.com')">✉️ Send Email</button></div></div>
-</div>
-
-<div class="bottom-nav">
-  <div class="nav-item active" id="nav-garage" onclick="showSection('garage')"><span>🏠</span>My Garage</div>
-  <div class="nav-item" id="nav-call" onclick="showSection('call')"><span>📞</span>Call Vehicle</div>
-  <div class="nav-item" id="nav-logs" onclick="showSection('logs')"><span>🕒</span>Logs</div>
-</div>
-
-<div class="modal" id="qrModal"><div class="modal-box"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><h3>QR Code</h3><button class="btn btn-d btn-sm" onclick="closeModal('qrModal')">✕</button></div><div style="text-align:center"><img id="qrImg" style="width:220px;height:220px;border-radius:12px;border:1px solid var(--border)"><p style="font-size:11px;color:var(--muted);margin-top:8px">Scan this QR to call vehicle owner</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn btn-w" onclick="downloadQR()">Download JPG</button><button class="btn btn-d" onclick="closeModal('qrModal')">Close</button></div></div></div></div>
-
-<div class="modal" id="stickerModal">
-  <div class="modal-box" style="max-width:460px">
-    <div style="display:flex;justify-content:space-between;margin-bottom:10px"><h3>Windshield Card</h3><button class="btn btn-d btn-sm" onclick="closeModal('stickerModal')">✕</button></div>
-    <div class="sticker" id="stickerPreview">
-      <div class="sticker-top"><h4>🚗 VEHICLE CALL ALERT</h4><span>SCAN & CALL</span></div>
-      <div class="sticker-mid">
-        <div class="sticker-qr"><img id="stickerQR" src=""></div>
-        <div class="sticker-info">
-          <b id="stickerNumber">UP16AB1234</b>
-          <div style="font-family:Righteous;font-size:20px;margin:6px 0">NEED ME?<br>SCAN & CALL!</div>
-          <p>If my vehicle blocks you, wrong parking, emergency:</p>
-          <p><b>1. Scan QR  2. Tap Call Owner</b><br>Privacy call • HD Voice</p>
-        </div>
-      </div>
-      <div class="sticker-bottom">⚠️ PLEASE CALL - I WILL MOVE MY VEHICLE ASAP</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-      <button class="btn btn-w" onclick="downloadStickerJPG()">📷 JPG</button>
-      <button class="btn btn-w" onclick="downloadStickerPDF()">📄 PDF</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const LIVE_BASE="https://datashield-cloud.github.io/Temp-call/";
-let vehicles=JSON.parse(localStorage.getItem('vca_v3_vehicles')||'[]');
-let callLogs=JSON.parse(localStorage.getItem('vca_v3_logs')||'[]');
-let peers={}; let localStream=null; let currentCall=null; let globalTimerInt=null, globalSeconds=0;
-let theme=localStorage.getItem('vca_theme')||'dark';
-let isMuted=false;
-
-function applyTheme(t){
-  theme=t;
-  localStorage.setItem('vca_theme', t);
-  if(t==='system'){
-    const isDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-theme', isDark?'dark':'light');
-    document.getElementById('themeBtn').textContent=isDark?'🌙':'☀️';
-  } else {
-    document.documentElement.setAttribute('data-theme', t);
-    document.getElementById('themeBtn').textContent=t==='dark'?'🌙':'☀️';
-  }
-}
-function cycleTheme(){
-  const order=['dark','light','system'];
-  const next=order[(order.indexOf(theme)+1)%order.length];
-  applyTheme(next);
-}
-applyTheme(theme);
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e=>{
-  if(theme==='system') applyTheme('system');
-});
-
-function saveVehicles(){ localStorage.setItem('vca_v3_vehicles', JSON.stringify(vehicles)); renderVehicles(); }
-function saveLogs(){ localStorage.setItem('vca_v3_logs', JSON.stringify(callLogs)); renderLogs(); renderHomeLogs(); }
-
-function addVehicle(){
-  const num=document.getElementById('newNumber').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-  const type=document.getElementById('newType').value;
-  const nick=document.getElementById('newNick').value||num;
-  if(num.length<4){ alert('Enter valid number'); return; }
-  if(vehicles.find(v=>v.number===num)){ alert('Already added'); return; }
-  vehicles.push({number:num, type:type, nick:nick, online:false, id:Date.now()});
-  document.getElementById('newNumber').value=''; document.getElementById('newNick').value='';
-  saveVehicles();
-}
-
-function renderVehicles(){
-  const list=document.getElementById('vehicleList');
-  document.getElementById('vehicleCount').textContent=vehicles.length;
-  if(vehicles.length===0){ list.innerHTML='<div class="card" style="text-align:center;color:var(--muted);padding:30px">No vehicles<br>Add your car/bike</div>'; return; }
-  list.innerHTML=vehicles.map(v=>`
+  <!-- ================= LOGS ================= -->
+  <section id="sec-logs" class="section hidden">
     <div class="card">
-      <div class="plate"><div><div style="font-size:9px;color:#666;font-weight:700">${v.type.toUpperCase()} • ${v.nick}</div><b>${v.number}</b></div><span class="status-dot ${v.online?'online':''}"></span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn ${v.online?'btn-r':'btn-g'} btn-sm" data-action="toggle" data-number="${v.number}">${v.online?'🔴 Offline':'🟢 Online'}</button>
-        <button class="btn btn-d btn-sm" data-action="qr" data-number="${v.number}">QR</button>
-        <button class="btn btn-w btn-sm" data-action="sticker" data-number="${v.number}">🪟 Card</button>
-        <button class="btn btn-d btn-sm" data-action="share" data-number="${v.number}">Share</button>
-        <button class="btn btn-d btn-sm" data-action="delete" data-number="${v.number}">🗑️</button>
-      </div>
-      ${v.online?'<div style="font-size:11px;color:var(--green);margin-top:6px">● Online - Auto reconnect on</div>':''}
+      <h2 class="card-title">Call history <button class="btn btn-ghost btn-sm" id="clearLogsBtn">Clear</button></h2>
+      <div id="logList"></div>
     </div>
-  `).join('');
-  list.querySelectorAll('[data-action]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const a=btn.dataset.action, n=btn.dataset.number;
-      if(a==='toggle') toggleOnline(n);
-      else if(a==='qr') showQR(n);
-      else if(a==='sticker') showSticker(n);
-      else if(a==='share') shareVehicle(n);
-      else if(a==='delete') deleteVehicle(n);
-    });
-  });
-}
+  </section>
 
-async function toggleOnline(number){ const v=vehicles.find(x=>x.number===number); if(!v) return; if(v.online) goOffline(number); else await goOnline(number); }
+  <!-- ================= HOW TO ================= -->
+  <section id="sec-howto" class="section hidden">
+    <div class="card">
+      <h2 class="card-title">How to use</h2>
+      <ol class="steps">
+        <li>Add your vehicle number in <b>My Garage</b>.</li>
+        <li>Tap <b>Go online</b> so people can reach you. You stay reachable while the app is open.</li>
+        <li>Open <b>Windshield card</b>, save or share it, print it and place it on your dashboard.</li>
+        <li>Anyone who needs you scans the QR code, or types your vehicle number in this app, and taps call.</li>
+        <li>Your phone number is never displayed or shared.</li>
+      </ol>
+      <p class="small muted mt8">Tip: keep the app open in the background while parked. Android may close background
+        apps to save battery — if you were closed, simply reopen the app and go online again.</p>
+    </div>
+  </section>
 
-async function goOnline(number){
-  const v=vehicles.find(x=>x.number===number); if(!v) return;
-  if(peers[number]){ try{peers[number].destroy()}catch(e){} }
-  try{
-    if(!localStream) localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, sampleRate:48000}});
-  }catch(e){ alert('Mic permission needed'); return; }
-  const peer=new Peer(number, {config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}]}});
-  peers[number]=peer; v.online=true; saveVehicles();
-  document.getElementById('globalStatusCard').style.display='block';
-  document.getElementById('globalStatus').innerHTML=`🟢 Online as <b>${number}</b> - Waiting`;
-  startGlobalTimer();
-  peer.on('open',()=>{ localStorage.setItem('vca_last_online', JSON.stringify(vehicles.filter(x=>x.online).map(x=>x.number))); });
-  peer.on('call', async (call)=>{
-    document.getElementById('globalStatus').innerHTML=`🔔 Incoming for <b>${number}</b>...`;
-    try{
-      if(!localStream) localStream=await navigator.mediaDevices.getUserMedia({audio:true});
-      call.answer(localStream);
-      const start=Date.now();
-      call.on('stream', s=>{
-        document.getElementById('remoteAudio').srcObject=s;
-        document.getElementById('remoteAudio').play().catch(()=>{});
-        document.getElementById('globalStatus').innerHTML=`✅ Connected <b>${number}</b> - HD Voice`;
-        addLog({vehicle:number, dir:'incoming', status:'answered', start:start});
-      });
-      call.on('close',()=>{
-        const dur=Math.floor((
+  <!-- ================= SETTINGS ================= -->
+  <section id="sec-settings" class="section hidden">
+    <div class="card">
+      <h2 class="card-title">Settings</h2>
+      <label class="label" for="themeSelect">Appearance</label>
+      <select id="themeSelect" class="input">
+        <option value="system">Follow system</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+
+      <label class="label" for="linkBase">QR call link (web page used by scanners)</label>
+      <input id="linkBase" class="input" placeholder="https://example.com/call" autocomplete="off" spellcheck="false">
+      <p class="small muted">Scanners that are not app users open this page. Leave the default if you are unsure.</p>
+      <button class="btn btn-primary btn-full" id="saveSettingsBtn">Save settings</button>
+    </div>
+    <div class="card">
+      <h2 class="card-title">Data</h2>
+      <p class="small muted">Everything is stored locally on this device.</p>
+      <button class="btn btn-danger btn-full" id="wipeBtn">Delete all app data</button>
+    </div>
+  </section>
+
+  <!-- ================= PRIVACY ================= -->
+  <section id="sec-privacy" class="section hidden">
+    <div class="card legal">
+      <h2 class="card-title">Privacy policy</h2>
+      <p class="small muted">Last updated: 7 September 2026</p>
+      <h3>What we collect</h3>
+      <p>Nothing. Vehicle Call Alert has no accounts, no analytics and no advertising SDKs. We do not collect,
+         transmit or sell personal data.</p>
+      <h3>Data stored on your device</h3>
+      <p>Your vehicle numbers, nicknames, app settings and call history are saved only in this app's local
+         storage. Uninstalling the app or tapping "Delete all app data" removes them permanently.</p>
+      <h3>Microphone</h3>
+      <p>Microphone access is used only while a voice call is active, so the other person can hear you. Audio is
+         never recorded, stored or uploaded. Calls are peer-to-peer and encrypted in transit (DTLS-SRTP).</p>
+      <h3>Network</h3>
+      <p>To connect a call the app contacts a public signalling server (PeerJS) and public STUN servers. These
+         services see the vehicle number used as a connection ID and your network address, which is required to
+         set up any internet call. No call audio passes through our servers.</p>
+      <h3>Children</h3>
+      <p>The app is not directed to children under 13.</p>
+      <h3>Your choices</h3>
+      <p>You can revoke microphone access at any time in Android Settings, and delete all local data from the
+         Settings screen in this app.</p>
+      <h3>Contact</h3>
+      <p>Questions or data requests: <a href="mailto:DataShield.studio@gmail.com">DataShield.studio@gmail.com</a></p>
+    </div>
+  </section>
+
+  <!-- ================= ABOUT ================= -->
+  <section id="sec-about" class="section hidden">
+    <div class="card">
+      <h2 class="card-title">About</h2>
+      <p><b>Vehicle Call Alert</b> lets anyone reach a vehicle owner through a QR code without ever seeing a
+         phone number — useful for blocked driveways, wrong parking or emergencies.</p>
+      <p class="small muted mt8">Version 1.0 (build 1)<br>Contact: DataShield.studio@gmail.com</p>
+      <h3 class="mt8">Open source components</h3>
+      <p class="small muted">PeerJS (MIT), jsPDF (MIT), qrcode-generator by Kazuhiko Arase (MIT). All libraries are
+         bundled inside the app; nothing is downloaded at runtime.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= BOTTOM NAV ================= -->
+<nav class="bottom-nav" aria-label="Main navigation">
+  <button class="nav-item active" data-section="garage">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+    <span>Garage</span>
+  </button>
+  <button class="nav-item" data-section="call">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .58 3.6 1 1 0 0 1-.25 1z"/></svg>
+    <span>Call</span>
+  </button>
+  <button class="nav-item" data-section="logs">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span>History</span>
+  </button>
+</nav>
+
+<!-- ================= CALL OVERLAY ================= -->
+<div class="modal" id="callModal" role="dialog" aria-modal="true" aria-labelledby="callTitle">
+  <div class="modal-box call-box">
+    <p class="call-kicker" id="callKicker">Calling</p>
+    <h3 class="call-plate" id="callTitle">UP16AB1234</h3>
+    <p class="call-status" id="callStatus">Connecting…</p>
+    <p class="call-timer" id="callTimer">00:00</p>
+    <div class="call-actions" id="callActions">
+      <button class="btn btn-ghost" id="muteBtn">Mute</button>
+      <button class="btn btn-ghost" id="speakerBtn">Speaker</button>
+      <button class="btn btn-danger" id="hangupBtn">End call</button>
+    </div>
+    <div class="call-actions hidden" id="incomingActions">
+      <button class="btn btn-danger" id="declineBtn">Decline</button>
+      <button class="btn btn-success" id="acceptBtn">Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= QR MODAL ================= -->
+<div class="modal" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="qrTitle">QR code</h3>
+      <button class="btn btn-ghost btn-sm" data-close-modal="qrModal" aria-label="Close">Close</button>
+    </div>
+    <div class="center">
+      <canvas id="qrCanvas" width="480" height="480" class="qr-canvas"></canvas>
+      <p class="small muted mt8">Scan to call <b id="qrNumber"></b></p>
+      <button class="btn btn-primary btn-full" id="shareQrBtn">Save / share QR</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CARD MODAL ================= -->
+<div class="modal" id="cardModal" role="dialog" aria-modal="true" aria-labelledby="cardTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="cardTitle">Windshield card</h3>
+      <button class="btn btn-ghost btn-sm" data-close-modal="cardModal" aria-label="Close">Close</button>
+    </div>
+    <canvas id="cardCanvas" width="1200" height="720" class="card-canvas"></canvas>
+    <div class="grid-2 mt8">
+      <button class="btn btn-primary" id="cardJpgBtn">Save JPG</button>
+      <button class="btn btn-ghost" id="cardPdfBtn">Save PDF</button>
+    </div>
+    <p class="small muted mt8">Print the card and place it on your dashboard so it is visible through the windshield.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<audio id="remoteAudio" autoplay playsinline></audio>
+
+<script src="lib/qrcode.js"></script>
+<script src="lib/peerjs.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
