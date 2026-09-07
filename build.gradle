@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.6.0'  // FIXED: was 8.2.2 doesn't support API 36
+        classpath 'com.android.tools.build:gradle:8.3.2'
     }
 }
 
