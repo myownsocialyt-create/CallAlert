@@ -1,6 +1,6 @@
 // Top-level build file. Plugin versions are declared here and applied in modules.
 plugins {
-    id 'com.android.application' version '8.9.1' apply false
+    id 'com.android.application' version '8.13.0' apply false
 }
 
 tasks.register('clean', Delete) {
