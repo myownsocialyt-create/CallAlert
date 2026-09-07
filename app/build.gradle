@@ -4,36 +4,43 @@ plugins {
 
 android {
     namespace 'com.datashield.vehiclecallalert'
-    compileSdk 36
+    compileSdk 34  // Use 34 for stable build, target still 36 for Play Console
 
     defaultConfig {
         applicationId "com.datashield.vehiclecallalert"
         minSdk 21
-        targetSdk 36
+        targetSdk 36  // Play Console requires 36
         versionCode 1
         versionName "1.0"
+    }
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    signingConfigs {
+        release {
+            storeFile file('vehicle-call-alert.jks')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("KEY_ALIAS") ?: "vehiclecallalert"
+            keyPassword System.getenv("KEY_PASSWORD") ?: ""
+        }
     }
 
     buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // For Play Store AAB signing, add signingConfigs if needed
-        }
         debug {
             minifyEnabled false
         }
+        release {
+            minifyEnabled false
+            // Will use unsigned if no keystore secrets, signed if secrets present
+            signingConfig signingConfigs.release
+        }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:1.11.0'
-    implementation 'androidx.core:core:1.12.0'
+    implementation 'com.google.android.material:material:1.12.0'  // FIXED: was 1.11.0 not found
+    implementation 'androidx.webkit:webkit:1.8.0'
 }
