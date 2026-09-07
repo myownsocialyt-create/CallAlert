@@ -55,7 +55,9 @@ jobs:
           fi
 
       - name: Build debug APK
-        run: ./gradlew --no-daemon --stacktrace assembleDebug
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleDebug 2>&1 | tee -a build.log
 
       - name: Build release APK and AAB
         env:
@@ -63,10 +65,28 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease 2>&1 | tee -a build.log
 
       - name: Run Android Lint
-        run: ./gradlew --no-daemon lintRelease
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon lintRelease 2>&1 | tee -a build.log
+
+
+      - name: Report build failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          try:
+              lines = open('build.log', errors='replace').read().splitlines()
+          except OSError:
+              lines = ['build.log not found']
+          keep = [l for l in lines if l.strip()][-150:]
+          msg = '%0A'.join(l.replace('%', '%25').replace('\r', '') for l in keep)
+          print('::error title=Gradle build failed::' + msg)
+          PY
 
       - name: Show lint findings
         if: always()
