@@ -1,6 +1,6 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Vehicle Call Alert</string>
-    <string name="app_description">Let people call a vehicle owner by scanning a QR code — the phone number is never shared. Private HD voice calls over the internet.</string>
+    <string name="app_description" tools:ignore="UnusedResources">Let people call a vehicle owner by scanning a QR code — the phone number is never shared. Private HD voice calls over the internet.</string>
     <string name="mic_permission_rationale">Microphone access is needed so you can talk during a call. Audio is never recorded or stored.</string>
     <string name="mic_permission_denied">Microphone permission denied. Voice calls will not work until you allow it in Settings.</string>
     <string name="no_app_to_handle">No app available to open this link.</string>

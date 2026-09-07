@@ -67,6 +67,8 @@ android {
     lint {
         // Newer library versions require compileSdk 37 / AGP 9; see the dependency block.
         disable 'GradleDependency'
+        // targetSdk 36 is exactly what Google Play requires; API 37 needs AGP 9.
+        disable 'OldTargetApi'
         abortOnError false
         checkReleaseBuilds true
         warningsAsErrors false

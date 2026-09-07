@@ -26,7 +26,9 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -227,7 +229,18 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         pendingPermissionRequest = request;
-        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO)) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.app_name)
+                    .setMessage(R.string.mic_permission_rationale)
+                    .setPositiveButton(android.R.string.ok,
+                            (dialog, which) -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO))
+                    .setNegativeButton(android.R.string.cancel, (dialog, which) -> onMicPermissionResult(false))
+                    .setOnCancelListener(dialog -> onMicPermissionResult(false))
+                    .show();
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+        }
     }
 
     private void onMicPermissionResult(boolean granted) {
