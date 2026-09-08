@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call screen preview</title>
+<style>
+  :root{
+    --start:#070B18; --mid:#141B3D; --end:#0A1F2C; --glow:#38BDF8;
+    --text:#FAFAFA; --muted:#9F9FA9; --green:#22C55E; --green2:#4ADE80;
+    --red:#EF4444; --red2:#F87171; --glass:rgba(255,255,255,.12); --stroke:rgba(255,255,255,.2);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:#05070f;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px;color:#e6e6ea}
+  .switcher{display:flex;gap:8px}
+  .switcher button{background:#161b2e;border:1px solid #2a3250;color:#dfe3f0;border-radius:999px;
+       padding:8px 16px;font-size:13px;cursor:pointer}
+  .switcher button.on{background:#38BDF8;color:#04121c;border-color:#38BDF8;font-weight:700}
+  .phone{width:360px;max-width:96vw;height:740px;max-height:82vh;border-radius:34px;overflow:hidden;
+       border:8px solid #12141d;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+       padding:44px 24px 34px;color:var(--text);
+       background:
+         radial-gradient(420px 420px at 50% 22%, rgba(56,189,248,.20), transparent 70%),
+         linear-gradient(200deg, var(--start), var(--mid) 55%, var(--end));}
+  .brand{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);opacity:.7;font-weight:700}
+  .status{margin-top:14px;font-size:17px}
+  .subtitle{margin-top:6px;font-size:13px;color:var(--muted)}
+  .avatar-wrap{margin-top:auto;width:200px;height:200px;position:relative;display:grid;place-items:center}
+  .pulse{position:absolute;inset:0;border-radius:50%;background:rgba(56,189,248,.14);transform:scale(.65);opacity:.9}
+  .ringing .pulse{animation:pulse 1.8s ease-in-out infinite}
+  .ringing .pulse:nth-child(2){animation-delay:.9s}
+  @keyframes pulse{0%{transform:scale(.65);opacity:.9}100%{transform:scale(1);opacity:0}}
+  .avatar{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;
+       background:linear-gradient(180deg,#1E2A55,#101733);border:1px solid var(--stroke);position:relative}
+  .avatar svg{width:64px;height:64px;fill:#FAFAFA}
+  .plate{margin-top:26px;background:#F8FAFC;border:2px solid #0F172A;border-radius:10px;
+       padding:9px 20px;color:#0F172A;font-family:ui-monospace,monospace;font-weight:700;font-size:24px;letter-spacing:.14em}
+  .timer{margin-top:16px;font-family:ui-monospace,monospace;font-size:18px;color:var(--glow);letter-spacing:.08em}
+  .spacer{margin-top:auto}
+  .controls{display:flex;gap:36px;justify-content:center}
+  .ctl{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .btn{width:64px;height:64px;border-radius:50%;border:1px solid var(--stroke);background:var(--glass);
+       display:grid;place-items:center;cursor:pointer}
+  .btn.on{background:rgba(255,255,255,.35)}
+  .btn svg{width:26px;height:26px;fill:#FAFAFA}
+  .big{width:76px;height:76px;border:none;box-shadow:0 10px 24px rgba(0,0,0,.45)}
+  .accept{background:linear-gradient(180deg,var(--green2),var(--green))}
+  .decline{background:linear-gradient(180deg,var(--red2),var(--red))}
+  .big svg{width:30px;height:30px}
+  .label{font-size:12px;color:var(--muted)}
+  .row{display:flex;width:100%;justify-content:space-around;align-items:flex-start}
+  .hidden{display:none}
+  .hangup-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:28px}
+  .note{font-size:12px;color:#8b90a3;text-align:center;max-width:360px}
+</style>
+</head>
+<body>
+
+<div class="switcher">
+  <button id="btnIncoming" class="on">Incoming</button>
+  <button id="btnActive">In call</button>
+</div>
+
+<div class="phone">
+  <div class="screen ringing" id="screen">
+    <div class="brand">Vehicle Call Alert</div>
+    <div class="status" id="status">Incoming call</div>
+    <div class="subtitle" id="subtitle">Someone scanned your vehicle QR code</div>
+
+    <div class="avatar-wrap">
+      <div class="pulse"></div>
+      <div class="pulse"></div>
+      <div class="avatar">
+        <svg viewBox="0 0 24 24"><path d="M18.9,6.5C18.7,5.6 17.9,5 17,5H7C6.1,5 5.3,5.6 5.1,6.5L3.5,11.2C3.2,11.6 3,12.1 3,12.7V18c0,0.6 0.4,1 1,1h1.5c0.6,0 1,-0.4 1,-1v-1h11v1c0,0.6 0.4,1 1,1H20c0.6,0 1,-0.4 1,-1v-5.3c0,-0.5 -0.2,-1 -0.5,-1.4L18.9,6.5zM6.9,7h10.2l1.2,3.5H5.7L6.9,7zM6.5,15C5.7,15 5,14.3 5,13.5S5.7,12 6.5,12S8,12.7 8,13.5S7.3,15 6.5,15zM17.5,15c-0.8,0 -1.5,-0.7 -1.5,-1.5s0.7,-1.5 1.5,-1.5s1.5,0.7 1.5,1.5S18.3,15 17.5,15z"/></svg>
+      </div>
+    </div>
+
+    <div class="plate">UP16AB1234</div>
+    <div class="timer hidden" id="timer">00:07</div>
+
+    <div class="spacer"></div>
+
+    <!-- in-call controls -->
+    <div id="activeActions" class="hidden" style="width:100%;display:none;flex-direction:column;align-items:center">
+      <div class="controls">
+        <div class="ctl">
+          <div class="btn" id="mute">
+            <svg viewBox="0 0 24 24"><path d="M12,14c1.7,0 3,-1.3 3,-3V5c0,-1.7 -1.3,-3 -3,-3S9,3.3 9,5v6C9,12.7 10.3,14 12,14z"/><path d="M17,11c0,2.8 -2.2,5 -5,5s-5,-2.2 -5,-5H5c0,3.5 2.6,6.4 6,6.9V21h2v-3.1c3.4,-0.5 6,-3.4 6,-6.9H17z"/></svg>
+          </div>
+          <div class="label" id="muteLabel">Mute</div>
+        </div>
+        <div class="ctl">
+          <div class="btn on" id="speaker">
+            <svg viewBox="0 0 24 24"><path d="M4,9v6h4l5,5V4L8,9H4z"/><path d="M16.5,12c0,-1.8 -1,-3.3 -2.5,-4v8C15.5,15.3 16.5,13.8 16.5,12z"/><path d="M14,3.2v2.1c2.9,0.9 5,3.5 5,6.7s-2.1,5.8 -5,6.7v2.1c4,-0.9 7,-4.5 7,-8.8S18,4.1 14,3.2z"/></svg>
+          </div>
+          <div class="label" id="speakerLabel">Speaker on</div>
+        </div>
+      </div>
+      <div class="hangup-wrap">
+        <div class="btn big decline"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.6,10.8c1.4,2.8 3.8,5.2 6.6,6.6l2.2,-2.2c0.3,-0.3 0.7,-0.4 1,-0.2c1.1,0.4 2.4,0.6 3.6,0.6c0.6,0 1,0.4 1,1V20c0,0.6 -0.4,1 -1,1C10.6,21 3,13.4 3,4c0,-0.6 0.4,-1 1,-1h3.5c0.6,0 1,0.4 1,1c0,1.3 0.2,2.5 0.6,3.6c0.1,0.4 0,0.7 -0.2,1L6.6,10.8z"/></svg></div>
+        <div class="label">End call</div>
+      </div>
+    </div>
+
+    <!-- incoming controls -->
+    <div id="incomingActions" class="row">
+      <div class="ctl">
+        <div class="btn big decline"><svg viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M6.6,10.8c1.4,2.8 3.8,5.2 6.6,6.6l2.2,-2.2c0.3,-0.3 0.7,-0.4 1,-0.2c1.1,0.4 2.4,0.6 3.6,0.6c0.6,0 1,0.4 1,1V20c0,0.6 -0.4,1 -1,1C10.6,21 3,13.4 3,4c0,-0.6 0.4,-1 1,-1h3.5c0.6,0 1,0.4 1,1c0,1.3 0.2,2.5 0.6,3.6c0.1,0.4 0,0.7 -0.2,1L6.6,10.8z"/></svg></div>
+        <div class="label">Decline</div>
+      </div>
+      <div class="ctl">
+        <div class="btn big accept"><svg viewBox="0 0 24 24"><path d="M6.6,10.8c1.4,2.8 3.8,5.2 6.6,6.6l2.2,-2.2c0.3,-0.3 0.7,-0.4 1,-0.2c1.1,0.4 2.4,0.6 3.6,0.6c0.6,0 1,0.4 1,1V20c0,0.6 -0.4,1 -1,1C10.6,21 3,13.4 3,4c0,-0.6 0.4,-1 1,-1h3.5c0.6,0 1,0.4 1,1c0,1.3 0.2,2.5 0.6,3.6c0.1,0.4 0,0.7 -0.2,1L6.6,10.8z"/></svg></div>
+        <div class="label">Accept</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note">Preview of the Android full-screen call screen (activity_call.xml) — same colours, sizes and
+animation as the app. Tap the buttons above to switch between the ringing and in-call states.</p>
+
+<script>
+  var screenEl = document.getElementById('screen');
+  var incoming = document.getElementById('incomingActions');
+  var active = document.getElementById('activeActions');
+  var timer = document.getElementById('timer');
+
+  function show(state) {
+    var isIncoming = state === 'incoming';
+    document.getElementById('btnIncoming').classList.toggle('on', isIncoming);
+    document.getElementById('btnActive').classList.toggle('on', !isIncoming);
+    screenEl.classList.toggle('ringing', isIncoming);
+    incoming.style.display = isIncoming ? 'flex' : 'none';
+    active.style.display = isIncoming ? 'none' : 'flex';
+    timer.classList.toggle('hidden', isIncoming);
+    document.getElementById('status').textContent = isIncoming ? 'Incoming call' : 'Connected';
+    document.getElementById('subtitle').textContent = isIncoming
+      ? 'Someone scanned your vehicle QR code'
+      : 'HD voice · end-to-end encrypted';
+  }
+  document.getElementById('btnIncoming').onclick = function () { show('incoming'); };
+  document.getElementById('btnActive').onclick = function () { show('active'); };
+
+  document.getElementById('mute').onclick = function () {
+    var on = this.classList.toggle('on');
+    document.getElementById('muteLabel').textContent = on ? 'Unmute' : 'Mute';
+  };
+  document.getElementById('speaker').onclick = function () {
+    var on = this.classList.toggle('on');
+    document.getElementById('speakerLabel').textContent = on ? 'Speaker on' : 'Speaker off';
+  };
+
+  var seconds = 7;
+  setInterval(function () {
+    if (timer.classList.contains('hidden')) { return; }
+    seconds++;
+    timer.textContent = ('0' + Math.floor(seconds / 60)).slice(-2) + ':' + ('0' + (seconds % 60)).slice(-2);
+  }, 1000);
+</script>
+</body>
+</html>

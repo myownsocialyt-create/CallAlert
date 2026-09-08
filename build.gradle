@@ -1,20 +1,11 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.2'
-    }
+// Top-level build file. Plugin versions are declared here and applied in modules.
+plugins {
+    id 'com.android.application' version '8.13.0' apply false
+    // Applied by :app only when a google-services.json file is present, so the project keeps
+    // building (with the always-connected fallback) before Firebase is set up.
+    id 'com.google.gms.google-services' version '4.4.2' apply false
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
 }

@@ -2,34 +2,101 @@ plugins {
     id 'com.android.application'
 }
 
+// Push wake-up is optional: drop app/google-services.json into the project to enable it.
+def firebaseConfig = file("google-services.json")
+if (firebaseConfig.exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
+// Optional release signing.
+// Provide either a keystore.properties file in the project root (never commit it)
+// or the matching environment variables (used by CI).
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def ksStoreFile = keystoreProperties.getProperty("storeFile") ?: System.getenv("RELEASE_STORE_FILE")
+def ksStorePassword = keystoreProperties.getProperty("storePassword") ?: System.getenv("RELEASE_STORE_PASSWORD")
+def ksKeyAlias = keystoreProperties.getProperty("keyAlias") ?: System.getenv("RELEASE_KEY_ALIAS")
+def ksKeyPassword = keystoreProperties.getProperty("keyPassword") ?: System.getenv("RELEASE_KEY_PASSWORD")
+def hasReleaseSigning = ksStoreFile != null && !ksStoreFile.trim().isEmpty() && rootProject.file(ksStoreFile).exists()
+
 android {
     namespace 'com.datashield.vehiclecallalert'
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.datashield.vehiclecallalert"
-        minSdk 21
+        minSdk 24
         targetSdk 36
         versionCode 1
         versionName "1.0"
     }
 
+    if (hasReleaseSigning) {
+        signingConfigs {
+            release {
+                storeFile rootProject.file(ksStoreFile)
+                storePassword ksStorePassword
+                keyAlias ksKeyAlias
+                keyPassword ksKeyPassword
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
+            // No applicationIdSuffix: Firebase (google-services.json) is registered for the
+            // release package name only, and push wake-up must work in debug builds too.
+            versionNameSuffix "-debug"
             minifyEnabled false
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    lint {
+        // Newer library versions require compileSdk 37 / AGP 9; see the dependency block.
+        disable 'GradleDependency'
+        // targetSdk 36 is exactly what Google Play requires; API 37 needs AGP 9.
+        disable 'OldTargetApi'
+        abortOnError false
+        checkReleaseBuilds true
+        warningsAsErrors false
+        htmlReport true
+        textReport true
+    }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.10.0'
-    implementation 'androidx.webkit:webkit:1.8.0'
+    // Pinned to the newest versions that still build against compileSdk 36.
+    // Newer AndroidX releases (core 1.19+, activity 1.13+, webkit 1.17+, material 1.14+)
+    // require compileSdk 37 and Android Gradle plugin 9.x, while Google Play currently
+    // requires apps to target API 36.
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'androidx.print:print:1.0.0'
+    implementation 'com.google.android.material:material:1.13.0'
+
+    // Wakes the app for an incoming call without keeping a permanent connection.
+    // Harmless when google-services.json is missing: the app then uses the foreground service.
+    implementation 'com.google.firebase:firebase-messaging:24.1.0'
 }

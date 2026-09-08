@@ -1,22 +1,23 @@
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
+.idea/
+.gradle/
+local.properties
+
+# Build outputs
+build/
+/app/build/
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+.DS_Store
 
-# APK/AAB build outputs
-/app/build/
-/build/
-
-# Keep wrapper jar
+# Signing material — never commit these
+keystore.properties
+*.jks
+*.keystore
 !gradle/wrapper/gradle-wrapper.jar
+
+# local test deps
+node_modules/
+tools/webtest/package-lock.json
+tools/webtest/package.json

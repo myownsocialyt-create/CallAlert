@@ -1,13 +1,14 @@
-# Keep WebView JS interfaces
+# Keep the JavaScript bridge that the bundled web UI talks to.
+-keep class com.datashield.vehiclecallalert.WebAppBridge { *; }
+-keepclassmembers class com.datashield.vehiclecallalert.WebAppBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
 -keepattributes JavascriptInterface
 -keepattributes *Annotation*
 
-# PeerJS / WebRTC
--keep class org.webrtc.** { *; }
--dontwarn org.webrtc.**
-
-# Gson if used
--keep class com.google.gson.** { *; }
+# Useful stack traces for Play Console crash reports.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

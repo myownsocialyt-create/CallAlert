@@ -1,8 +1,20 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
     <style name="Theme.VehicleCallAlert" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <!-- Edge-to-edge is mandatory from Android 15/16; insets are applied in code. -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
     </style>
+
+    <style name="Theme.VehicleCallAlert.Call" parent="Theme.VehicleCallAlert">
+        <item name="android:windowBackground">@drawable/bg_call_gradient</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+    </style>
+
 </resources>

@@ -1,8 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF08080A</color>
-    <color name="card">#FF131316</color>
-    <color name="yellow">#FFFACC15</color>
-    <color name="green">#FF22C55E</color>
-    <color name="white">#FFFAFAFA</color>
+    <!-- Background behind the WebView; matches the web UI background. -->
+    <color name="app_background">#FFF5F5F4</color>
+    <color name="ic_launcher_background">#FF111114</color>
+
+    <!-- Full screen call UI -->
+    <color name="call_text">#FFFAFAFA</color>
+    <color name="call_muted">#FF9F9FA9</color>
+    <color name="call_green">#FF22C55E</color>
+    <color name="call_red">#FFEF4444</color>
+    <color name="call_red_light">#FFF87171</color>
+    <color name="call_green_light">#FF4ADE80</color>
+    <color name="call_accent">#FF38BDF8</color>
+    <color name="call_gradient_start">#FF070B18</color>
+    <color name="call_gradient_mid">#FF141B3D</color>
+    <color name="call_gradient_end">#FF0A1F2C</color>
+    <color name="call_glow">#3338BDF8</color>
+    <color name="call_glass">#1FFFFFFF</color>
+    <color name="call_glass_active">#59FFFFFF</color>
+    <color name="call_glass_stroke">#33FFFFFF</color>
+    <color name="call_ripple">#33FFFFFF</color>
+    <color name="call_pulse">#1F38BDF8</color>
+    <color name="call_avatar_top">#FF1E2A55</color>
+    <color name="call_avatar_bottom">#FF101733</color>
+    <color name="plate_chip_bg">#FFF8FAFC</color>
+    <color name="plate_chip_stroke">#FF0F172A</color>
+    <color name="plate_chip_text">#FF0F172A</color>
 </resources>

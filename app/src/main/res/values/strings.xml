@@ -1,4 +1,57 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Vehicle Call Alert</string>
-    <string name="app_description">Call vehicle owner via QR — no phone number exposed. Privacy-first, HD Voice via WebRTC.</string>
+    <string name="app_description" tools:ignore="UnusedResources">Let people call a vehicle owner by scanning a QR code — the phone number is never shared. Private HD voice calls over the internet.</string>
+    <string name="mic_permission_rationale">Microphone access is needed so you can talk during a call. Audio is never recorded or stored.</string>
+    <string name="mic_permission_denied">Microphone permission denied. Voice calls will not work until you allow it in Settings.</string>
+    <string name="no_app_to_handle">No app available to open this link.</string>
+    <string name="offline_message">No internet connection. Vehicle Call Alert needs internet to place or receive calls.</string>
+    <string name="retry">Retry</string>
+    <string name="share_title">Share</string>
+    <string name="share_failed">Could not prepare the file for sharing.</string>
+
+    <!-- Notifications -->
+    <string name="channel_presence">Vehicle online status</string>
+    <string name="channel_presence_desc">Ongoing notice while your vehicle can receive calls.</string>
+    <string name="channel_incoming">Incoming calls</string>
+    <string name="channel_incoming_desc">Full screen alerts for incoming vehicle calls.</string>
+    <string name="channel_ongoing">Ongoing call</string>
+    <string name="channel_missed">Missed calls</string>
+    <string name="channel_missed_desc">Notice when a call could not be answered.</string>
+
+    <string name="notif_online">Vehicle online</string>
+    <string name="notif_online_desc">People can call %1$s</string>
+    <string name="notif_standby">Vehicle Call Alert</string>
+    <string name="notif_standby_desc">No vehicle is online</string>
+    <string name="notif_reconnecting">Reconnecting…</string>
+    <string name="notif_in_call">Call in progress</string>
+    <string name="notif_incoming_title">Incoming vehicle call</string>
+    <string name="notif_incoming_text">Someone is calling %1$s</string>
+    <string name="notif_incoming_person">Caller for %1$s</string>
+    <string name="notif_missed_title">Missed call</string>
+    <string name="notif_missed_text">Someone tried to call %1$s</string>
+    <string name="notif_missed_big">Someone tried to reach %1$s (%2$s). Open the app to go back online.</string>
+
+    <!-- Call screen -->
+    <string name="call_incoming">Incoming call</string>
+    <string name="call_privacy_note">Someone scanned your vehicle QR code</string>
+    <string name="call_outgoing_note">Calling the vehicle owner</string>
+    <string name="call_timer_zero">00:00</string>
+    <string name="call_connecting">Connecting…</string>
+    <string name="call_connected">Connected</string>
+    <string name="call_hd_note">HD voice · end-to-end encrypted</string>
+    <string name="call_ended">Call ended</string>
+    <string name="action_accept">Accept</string>
+    <string name="action_decline">Decline</string>
+    <string name="action_hang_up">End call</string>
+    <string name="action_mute">Mute</string>
+    <string name="action_unmute">Unmute</string>
+    <string name="action_speaker_on">Speaker on</string>
+    <string name="action_speaker_off">Speaker off</string>
+    <string name="action_call_back">Call back</string>
+    <string name="action_go_offline">Go offline</string>
+
+    <string name="notification_permission_needed">Allow notifications so incoming calls can ring on this phone.</string>
+    <string name="print_job_name">Vehicle Call Alert card</string>
+    <string name="print_failed">Printing is not available on this device.</string>
+    <string name="permissions_ready">All set — microphone and notifications are allowed.</string>
 </resources>
