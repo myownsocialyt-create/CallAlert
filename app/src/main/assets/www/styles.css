@@ -151,6 +151,8 @@ a { color: inherit; }
 .plate-input { text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.grid-3 .btn { padding: 12px 6px; font-size: 13px; }
 
 .btn {
   min-height: 48px;

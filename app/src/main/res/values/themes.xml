@@ -11,4 +11,10 @@
         <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
     </style>
 
+    <style name="Theme.VehicleCallAlert.Call" parent="Theme.VehicleCallAlert">
+        <item name="android:windowBackground">@color/call_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
 </resources>

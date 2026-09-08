@@ -3,15 +3,16 @@ package com.datashield.vehiclecallalert;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.PermissionRequest;
-import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -36,38 +37,44 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewAssetLoader;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.Locale;
 
 /**
- * Single activity that hosts the offline web UI of Vehicle Call Alert.
+ * Hosts the bundled web UI (garage, QR code, windshield card, history, settings).
  *
- * The UI is bundled inside the APK (app/src/main/assets/www) and served through
- * {@link WebViewAssetLoader} over https://appassets.androidplatform.net so the page
- * runs in a secure origin (required by WebRTC / getUserMedia) and no code is
- * downloaded at runtime.
+ * Presence and calls live in {@link CallService}; this activity only sends commands and
+ * renders the state that comes back through {@link CallBus}.
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements CallBus.Listener {
 
     private static final String APP_DOMAIN = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + APP_DOMAIN + "/assets/www/index.html";
 
+    private static final int PENDING_NONE = 0;
+    private static final int PENDING_ONLINE = 1;
+    private static final int PENDING_CALL = 2;
+
     private WebView webView;
     private View errorView;
-
     private WebViewAssetLoader assetLoader;
-    private PermissionRequest pendingPermissionRequest;
+
     private ActivityResultLauncher<String> micPermissionLauncher;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
+
+    private int pendingAction = PENDING_NONE;
+    private String pendingNumber = "";
 
     private int insetTopPx = 0;
     private int insetBottomPx = 0;
     private boolean pageReady = false;
 
-    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Android 15+ enforces edge-to-edge; insets are forwarded to the web layer as CSS vars.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
 
@@ -82,6 +89,13 @@ public class MainActivity extends AppCompatActivity {
 
         micPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(), this::onMicPermissionResult);
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(), granted -> {
+                    if (!granted) {
+                        Toast.makeText(this, R.string.notification_permission_needed, Toast.LENGTH_LONG).show();
+                    }
+                    continuePendingAction();
+                });
 
         assetLoader = new WebViewAssetLoader.Builder()
                 .setDomain(APP_DOMAIN)
@@ -100,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Let the web UI close its own drawer / modal / active call first.
                 webView.evaluateJavascript(
                         "(function(){return window.onNativeBack ? !!window.onNativeBack() : false;})();",
                         value -> {
@@ -115,6 +128,11 @@ public class MainActivity extends AppCompatActivity {
                         });
             }
         });
+
+        // Vehicles that were left online must come back online when the app is opened.
+        if (!Prefs.getOnline(this).isEmpty()) {
+            CallService.sync(this);
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -129,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         settings.setTextZoom(100);
@@ -140,6 +157,8 @@ public class MainActivity extends AppCompatActivity {
         if ((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
+
+        webView.addJavascriptInterface(new WebAppBridge(this), "AndroidBridge");
 
         webView.setWebViewClient(new WebViewClient() {
 
@@ -155,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
                     return false;
                 }
                 if (APP_DOMAIN.equals(uri.getHost())) {
-                    return false; // keep in-app pages inside the WebView
+                    return false;
                 }
                 return openExternally(uri);
             }
@@ -164,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 pageReady = true;
                 pushInsetsToWeb();
+                pushStateToWeb();
             }
 
             @Override
@@ -172,20 +192,6 @@ public class MainActivity extends AppCompatActivity {
                     webView.setVisibility(View.GONE);
                     errorView.setVisibility(View.VISIBLE);
                 }
-            }
-        });
-
-        webView.addJavascriptInterface(new WebAppBridge(this), "AndroidBridge");
-
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> handlePermissionRequest(request));
-            }
-
-            @Override
-            public void onPermissionRequestCanceled(PermissionRequest request) {
-                pendingPermissionRequest = null;
             }
         });
     }
@@ -207,55 +213,159 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return true;
             default:
-                // Unknown scheme (e.g. intent://) is simply ignored for safety.
                 return true;
         }
     }
 
-    private void handlePermissionRequest(@NonNull PermissionRequest request) {
-        boolean wantsAudio = false;
-        for (String resource : request.getResources()) {
-            if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
-                wantsAudio = true;
-            }
+    /* ------------------------------------------------------------------ web <-> native */
+
+    String stateJsonWithEnvironment() {
+        try {
+            JSONObject state = new JSONObject(Prefs.stateJson(this));
+            JSONObject env = new JSONObject();
+            env.put("app", true);
+            env.put("mic", hasMicPermission());
+            env.put("notifications", hasNotificationPermission());
+            env.put("batteryUnrestricted", isIgnoringBatteryOptimizations());
+            state.put("env", env);
+            return state.toString();
+        } catch (JSONException e) {
+            return Prefs.stateJson(this);
         }
-        if (!wantsAudio) {
-            request.deny();
+    }
+
+    void pushStateToWeb() {
+        if (!pageReady || webView == null) {
             return;
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED) {
-            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+        String json = stateJsonWithEnvironment().replace("\\", "\\\\").replace("'", "\\'");
+        webView.evaluateJavascript("if(window.onNativeState){window.onNativeState('" + json + "');}", null);
+    }
+
+    void requestGoOnline(String number) {
+        if (!hasMicPermission()) {
+            pendingAction = PENDING_ONLINE;
+            pendingNumber = number;
+            askForMicrophone();
             return;
         }
-        pendingPermissionRequest = request;
+        if (!hasNotificationPermission()) {
+            pendingAction = PENDING_ONLINE;
+            pendingNumber = number;
+            askForNotifications();
+            return;
+        }
+        CallService.goOnline(this, number);
+        pushStateToWeb();
+    }
+
+    void requestCall(String number) {
+        if (!hasMicPermission()) {
+            pendingAction = PENDING_CALL;
+            pendingNumber = number;
+            askForMicrophone();
+            return;
+        }
+        CallService.placeCall(this, number);
+    }
+
+    void requestCallPermissions() {
+        if (!hasMicPermission()) {
+            pendingAction = PENDING_NONE;
+            askForMicrophone();
+        } else if (!hasNotificationPermission()) {
+            askForNotifications();
+        } else {
+            Toast.makeText(this, R.string.permissions_ready, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void askForMicrophone() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.RECORD_AUDIO)) {
             new AlertDialog.Builder(this)
                     .setTitle(R.string.app_name)
                     .setMessage(R.string.mic_permission_rationale)
                     .setPositiveButton(android.R.string.ok,
                             (dialog, which) -> micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO))
-                    .setNegativeButton(android.R.string.cancel, (dialog, which) -> onMicPermissionResult(false))
-                    .setOnCancelListener(dialog -> onMicPermissionResult(false))
+                    .setNegativeButton(android.R.string.cancel, (dialog, which) -> clearPending())
+                    .setOnCancelListener(dialog -> clearPending())
                     .show();
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
         }
     }
 
-    private void onMicPermissionResult(boolean granted) {
-        PermissionRequest request = pendingPermissionRequest;
-        pendingPermissionRequest = null;
-        if (request == null) {
-            return;
-        }
-        if (granted) {
-            request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+    private void askForNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
         } else {
-            request.deny();
-            Toast.makeText(this, R.string.mic_permission_denied, Toast.LENGTH_LONG).show();
+            continuePendingAction();
         }
     }
+
+    private void onMicPermissionResult(boolean granted) {
+        if (!granted) {
+            clearPending();
+            Toast.makeText(this, R.string.mic_permission_denied, Toast.LENGTH_LONG).show();
+            pushStateToWeb();
+            return;
+        }
+        if (pendingAction == PENDING_ONLINE && !hasNotificationPermission()) {
+            askForNotifications();
+            return;
+        }
+        continuePendingAction();
+    }
+
+    private void continuePendingAction() {
+        int action = pendingAction;
+        String number = pendingNumber;
+        clearPending();
+
+        if (action == PENDING_ONLINE && !number.isEmpty()) {
+            CallService.goOnline(this, number);
+        } else if (action == PENDING_CALL && !number.isEmpty()) {
+            CallService.placeCall(this, number);
+        }
+        pushStateToWeb();
+    }
+
+    private void clearPending() {
+        pendingAction = PENDING_NONE;
+        pendingNumber = "";
+    }
+
+    private boolean hasMicPermission() {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean hasNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return true;
+        }
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean isIgnoringBatteryOptimizations() {
+        PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        return power != null && power.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    /* ------------------------------------------------------------------ CallBus */
+
+    @Override
+    public void onCallStateChanged(@NonNull CallBus.Snapshot snapshot) {
+        pushStateToWeb();
+    }
+
+    @Override
+    public void onDataChanged() {
+        pushStateToWeb();
+    }
+
+    /* ------------------------------------------------------------------ insets */
 
     private void applyInsetsListener() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root), (v, windowInsets) -> {
@@ -271,35 +381,56 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void pushInsetsToWeb() {
-        if (!pageReady) {
+        if (!pageReady || webView == null) {
             return;
         }
         float density = getResources().getDisplayMetrics().density;
         if (density <= 0f) {
             density = 1f;
         }
-        final int top = Math.round(insetTopPx / density);
-        final int bottom = Math.round(insetBottomPx / density);
-        String js = "if(window.applyNativeInsets){window.applyNativeInsets(" + top + "," + bottom + ");}";
-        webView.evaluateJavascript(js, null);
+        int top = Math.round(insetTopPx / density);
+        int bottom = Math.round(insetBottomPx / density);
+        webView.evaluateJavascript(
+                "if(window.applyNativeInsets){window.applyNativeInsets(" + top + "," + bottom + ");}", null);
     }
 
-    @Override
-    protected void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        webView.saveState(outState);
-    }
+    /* ------------------------------------------------------------------ lifecycle */
 
     @Override
-    protected void onPause() {
-        webView.onPause();
-        super.onPause();
+    protected void onStart() {
+        super.onStart();
+        CallBus.get().addListener(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        webView.onResume();
+        if (webView != null) {
+            webView.onResume();
+        }
+        pushStateToWeb();
+    }
+
+    @Override
+    protected void onPause() {
+        if (webView != null) {
+            webView.onPause();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        CallBus.get().removeListener(this);
+        super.onStop();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) {
+            webView.saveState(outState);
+        }
     }
 
     @Override
@@ -309,7 +440,6 @@ public class MainActivity extends AppCompatActivity {
             if (parent != null) {
                 parent.removeView(webView);
             }
-            webView.setWebChromeClient(null);
             webView.destroy();
             webView = null;
         }

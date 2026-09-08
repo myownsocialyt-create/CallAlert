@@ -1,17 +1,18 @@
 package com.datashield.vehiclecallalert;
 
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
-import android.content.Context;
 import android.content.Intent;
-import android.media.AudioManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
 import android.util.Base64;
-import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
+import androidx.print.PrintHelper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -21,37 +22,114 @@ import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
- * Small bridge exposed to the bundled web UI (and only to it — the WebView never
- * navigates away from the app assets). It provides the few things a web page
- * cannot do on its own: sharing a generated file, call audio routing and
- * keeping the screen on during a call.
+ * Bridge exposed to the bundled web UI (and only to it — the WebView never navigates away
+ * from the app assets). The UI keeps no calling logic of its own: presence and calls are
+ * handled by {@link CallService} so they survive the app being closed.
  */
 public class WebAppBridge {
 
     private static final String SHARE_DIR = "shared";
 
-    private final WeakReference<Activity> activityRef;
+    private final WeakReference<MainActivity> activityRef;
 
-    WebAppBridge(Activity activity) {
+    WebAppBridge(MainActivity activity) {
         this.activityRef = new WeakReference<>(activity);
     }
 
-    private Activity activity() {
+    private MainActivity activity() {
         return activityRef.get();
     }
 
+    /* ------------------------------------------------------------------ state */
+
     @JavascriptInterface
-    public void showToast(final String message) {
-        final Activity activity = activity();
-        if (activity == null || message == null) {
-            return;
+    public String getState() {
+        MainActivity activity = activity();
+        if (activity == null) {
+            return "{}";
         }
-        activity.runOnUiThread(() -> Toast.makeText(activity, message, Toast.LENGTH_SHORT).show());
+        return activity.stateJsonWithEnvironment();
     }
 
     @JavascriptInterface
+    public void saveVehicles(String json) {
+        MainActivity activity = activity();
+        if (activity == null || json == null) {
+            return;
+        }
+        Prefs.setVehicles(activity, json);
+    }
+
+    @JavascriptInterface
+    public void saveSettings(String json) {
+        MainActivity activity = activity();
+        if (activity == null || json == null) {
+            return;
+        }
+        Prefs.setSettings(activity, json);
+    }
+
+    @JavascriptInterface
+    public void clearLogs() {
+        MainActivity activity = activity();
+        if (activity == null) {
+            return;
+        }
+        Prefs.clearLogs(activity);
+        activity.pushStateToWeb();
+    }
+
+    @JavascriptInterface
+    public void wipeData() {
+        MainActivity activity = activity();
+        if (activity == null) {
+            return;
+        }
+        CallService.goOfflineAll(activity);
+        Prefs.wipe(activity);
+        activity.pushStateToWeb();
+    }
+
+    /* ------------------------------------------------------------------ presence + calls */
+
+    @JavascriptInterface
+    public void goOnline(final String number) {
+        final MainActivity activity = activity();
+        final String plate = CallService.sanitize(number);
+        if (activity == null || plate.isEmpty()) {
+            return;
+        }
+        activity.runOnUiThread(() -> activity.requestGoOnline(plate));
+    }
+
+    @JavascriptInterface
+    public void goOffline(final String number) {
+        final MainActivity activity = activity();
+        final String plate = CallService.sanitize(number);
+        if (activity == null || plate.isEmpty()) {
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            CallService.goOffline(activity, plate);
+            activity.pushStateToWeb();
+        });
+    }
+
+    @JavascriptInterface
+    public void startCall(final String number) {
+        final MainActivity activity = activity();
+        final String plate = CallService.sanitize(number);
+        if (activity == null || plate.isEmpty()) {
+            return;
+        }
+        activity.runOnUiThread(() -> activity.requestCall(plate));
+    }
+
+    /* ------------------------------------------------------------------ export */
+
+    @JavascriptInterface
     public void shareText(final String text) {
-        final Activity activity = activity();
+        final MainActivity activity = activity();
         if (activity == null || text == null) {
             return;
         }
@@ -63,13 +141,10 @@ public class WebAppBridge {
         });
     }
 
-    /**
-     * Writes a base64 payload into the app cache and opens the Android share sheet,
-     * so the user can save it to Files, Photos, Drive, WhatsApp, a printer, ...
-     */
+    /** Writes a base64 payload into the app cache and opens the Android share sheet. */
     @JavascriptInterface
     public void shareFile(final String base64Data, final String mimeType, final String fileName) {
-        final Activity activity = activity();
+        final MainActivity activity = activity();
         if (activity == null || base64Data == null) {
             return;
         }
@@ -99,58 +174,111 @@ public class WebAppBridge {
         });
     }
 
+    /** Sends a generated image (QR code or windshield card) to the Android print service. */
     @JavascriptInterface
-    public void startCallAudio() {
-        final Activity activity = activity();
+    public void printImage(final String base64Data, final String jobName) {
+        final MainActivity activity = activity();
+        if (activity == null || base64Data == null) {
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            try {
+                byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bitmap == null) {
+                    throw new IOException("decode");
+                }
+                PrintHelper helper = new PrintHelper(activity);
+                helper.setScaleMode(PrintHelper.SCALE_MODE_FIT);
+                helper.setOrientation(bitmap.getWidth() >= bitmap.getHeight()
+                        ? PrintHelper.ORIENTATION_LANDSCAPE : PrintHelper.ORIENTATION_PORTRAIT);
+                String name = jobName == null || jobName.trim().isEmpty()
+                        ? activity.getString(R.string.print_job_name) : jobName;
+                helper.printBitmap(name, bitmap);
+            } catch (Exception e) {
+                Toast.makeText(activity, R.string.print_failed, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /* ------------------------------------------------------------------ system settings */
+
+    @JavascriptInterface
+    public void openBatterySettings() {
+        final MainActivity activity = activity();
         if (activity == null) {
             return;
         }
         activity.runOnUiThread(() -> {
-            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            AudioManager audio = audioManager(activity);
-            if (audio != null) {
-                audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audio.setSpeakerphoneOn(true);
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            try {
+                activity.startActivity(intent);
+            } catch (ActivityNotFoundException e) {
+                openAppSettings();
             }
         });
     }
 
     @JavascriptInterface
-    public void setSpeakerphone(final boolean on) {
-        final Activity activity = activity();
+    public void openNotificationSettings() {
+        final MainActivity activity = activity();
         if (activity == null) {
             return;
         }
         activity.runOnUiThread(() -> {
-            AudioManager audio = audioManager(activity);
-            if (audio != null) {
-                audio.setMode(AudioManager.MODE_IN_COMMUNICATION);
-                audio.setSpeakerphoneOn(on);
+            try {
+                Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());
+                activity.startActivity(intent);
+            } catch (ActivityNotFoundException e) {
+                openAppSettings();
             }
         });
     }
 
     @JavascriptInterface
-    public void stopCallAudio() {
-        final Activity activity = activity();
+    public void openAppSettings() {
+        final MainActivity activity = activity();
         if (activity == null) {
             return;
         }
         activity.runOnUiThread(() -> {
-            activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            AudioManager audio = audioManager(activity);
-            if (audio != null) {
-                audio.setSpeakerphoneOn(false);
-                audio.setMode(AudioManager.MODE_NORMAL);
+            try {
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", activity.getPackageName(), null));
+                activity.startActivity(intent);
+            } catch (ActivityNotFoundException ignored) {
+                // nothing else we can do
             }
         });
     }
 
-    private static AudioManager audioManager(Context context) {
-        return (AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+    @JavascriptInterface
+    public void requestPermissions() {
+        final MainActivity activity = activity();
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(activity::requestCallPermissions);
     }
 
-    private static void startChooser(Activity activity, Intent intent) {
+    @JavascriptInterface
+    public void showToast(final String message) {
+        final MainActivity activity = activity();
+        if (activity == null || message == null) {
+            return;
+        }
+        activity.runOnUiThread(() -> Toast.makeText(activity, message, Toast.LENGTH_SHORT).show());
+    }
+
+    @JavascriptInterface
+    public int sdkInt() {
+        return Build.VERSION.SDK_INT;
+    }
+
+    /* ------------------------------------------------------------------ helpers */
+
+    private static void startChooser(MainActivity activity, Intent intent) {
         try {
             Intent chooser = Intent.createChooser(intent, activity.getString(R.string.share_title));
             chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

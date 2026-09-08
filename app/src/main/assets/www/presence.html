@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream:; connect-src https: wss:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>Vehicle Call Alert presence</title>
+</head>
+<body>
+<!-- Head-less page hosted by CallService: it keeps the PeerJS connections alive. -->
+<audio id="remoteAudio" autoplay playsinline></audio>
+<script src="lib/peerjs.min.js"></script>
+<script src="presence.js"></script>
+</body>
+</html>

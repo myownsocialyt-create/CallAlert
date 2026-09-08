@@ -100,7 +100,8 @@
       <input id="callNumber" class="input plate-input" placeholder="UP16AB1234" maxlength="15"
              autocomplete="off" autocapitalize="characters">
       <button class="btn btn-success btn-full" id="callBtn">Call now</button>
-      <p class="small muted mt8">The owner's phone number is never shown. The call runs over the internet.</p>
+      <p class="small muted mt8">The owner's phone number is never shown. The call runs over the internet
+        and opens on the full screen call display.</p>
     </div>
   </section>
 
@@ -118,18 +119,26 @@
       <h2 class="card-title">How to use</h2>
       <ol class="steps">
         <li>Add your vehicle number in <b>My Garage</b>.</li>
-        <li>Tap <b>Go online</b> so people can reach you. You stay reachable while the app is open.</li>
-        <li>Open <b>Windshield card</b>, save or share it, print it and place it on your dashboard.</li>
-        <li>Anyone who needs you scans the QR code, or types your vehicle number in this app, and taps call.</li>
-        <li>Your phone number is never displayed or shared.</li>
+        <li>Tap <b>Go online</b> once. The vehicle stays online in the background, with the screen off,
+            and comes back online automatically after the phone restarts — until you tap <b>Go offline</b>.</li>
+        <li>Open <b>Windshield card</b>, then save, share or print it and place it on your dashboard.</li>
+        <li>Anyone who needs you scans the QR code and taps “Call Vehicle Owner”, or types your vehicle
+            number in this app.</li>
+        <li>The call rings full screen, even when the phone is locked. If you miss it, you get a
+            missed-call notification.</li>
       </ol>
-      <p class="small muted mt8">Tip: keep the app open in the background while parked. Android may close background
-        apps to save battery — if you were closed, simply reopen the app and go online again.</p>
+      <p class="small muted mt8">For the most reliable delivery, allow notifications and set the battery
+        usage for this app to “Unrestricted” (see Settings).</p>
     </div>
   </section>
 
   <!-- ================= SETTINGS ================= -->
   <section id="sec-settings" class="section hidden">
+    <div class="card">
+      <h2 class="card-title">Always-online checklist</h2>
+      <div id="envList"></div>
+    </div>
+
     <div class="card">
       <h2 class="card-title">Settings</h2>
       <label class="label" for="themeSelect">Appearance</label>
@@ -139,11 +148,13 @@
         <option value="light">Light</option>
       </select>
 
-      <label class="label" for="linkBase">QR call link (web page used by scanners)</label>
+      <label class="label" for="linkBase">QR call page (used by people who scan)</label>
       <input id="linkBase" class="input" placeholder="https://example.com/call" autocomplete="off" spellcheck="false">
-      <p class="small muted">Scanners that are not app users open this page. Leave the default if you are unsure.</p>
+      <p class="small muted">The QR code opens this page with <code>?car_id=</code> and your vehicle number.
+        Leave the default if you are unsure.</p>
       <button class="btn btn-primary btn-full" id="saveSettingsBtn">Save settings</button>
     </div>
+
     <div class="card">
       <h2 class="card-title">Data</h2>
       <p class="small muted">Everything is stored locally on this device.</p>
@@ -155,7 +166,7 @@
   <section id="sec-privacy" class="section hidden">
     <div class="card legal">
       <h2 class="card-title">Privacy policy</h2>
-      <p class="small muted">Last updated: 7 September 2026</p>
+      <p class="small muted">Last updated: 8 September 2026</p>
       <h3>What we collect</h3>
       <p>Nothing. Vehicle Call Alert has no accounts, no analytics and no advertising SDKs. We do not collect,
          transmit or sell personal data.</p>
@@ -165,15 +176,18 @@
       <h3>Microphone</h3>
       <p>Microphone access is used only while a voice call is active, so the other person can hear you. Audio is
          never recorded, stored or uploaded. Calls are peer-to-peer and encrypted in transit (DTLS-SRTP).</p>
+      <h3>Background connection</h3>
+      <p>While a vehicle is online, a foreground service keeps the peer-to-peer connection open so calls can
+         reach you. It shows a permanent notification and stops as soon as every vehicle is offline.</p>
       <h3>Network</h3>
-      <p>To connect a call the app contacts a public signalling server (PeerJS) and public STUN servers. These
-         services see the vehicle number used as a connection ID and your network address, which is required to
-         set up any internet call. No call audio passes through our servers.</p>
+      <p>To connect a call the app contacts a public signalling server (PeerJS) and public STUN/TURN servers.
+         These services see the vehicle number used as a connection ID and your network address, which is
+         required to set up any internet call. No call audio passes through our servers.</p>
       <h3>Children</h3>
       <p>The app is not directed to children under 13.</p>
       <h3>Your choices</h3>
-      <p>You can revoke microphone access at any time in Android Settings, and delete all local data from the
-         Settings screen in this app.</p>
+      <p>You can revoke microphone or notification access at any time in Android Settings, and delete all local
+         data from the Settings screen in this app.</p>
       <h3>Contact</h3>
       <p>Questions or data requests: <a href="mailto:DataShield.studio@gmail.com">DataShield.studio@gmail.com</a></p>
     </div>
@@ -210,25 +224,6 @@
   </button>
 </nav>
 
-<!-- ================= CALL OVERLAY ================= -->
-<div class="modal" id="callModal" role="dialog" aria-modal="true" aria-labelledby="callTitle">
-  <div class="modal-box call-box">
-    <p class="call-kicker" id="callKicker">Calling</p>
-    <h3 class="call-plate" id="callTitle">UP16AB1234</h3>
-    <p class="call-status" id="callStatus">Connecting…</p>
-    <p class="call-timer" id="callTimer">00:00</p>
-    <div class="call-actions" id="callActions">
-      <button class="btn btn-ghost" id="muteBtn">Mute</button>
-      <button class="btn btn-ghost" id="speakerBtn">Speaker</button>
-      <button class="btn btn-danger" id="hangupBtn">End call</button>
-    </div>
-    <div class="call-actions hidden" id="incomingActions">
-      <button class="btn btn-danger" id="declineBtn">Decline</button>
-      <button class="btn btn-success" id="acceptBtn">Accept</button>
-    </div>
-  </div>
-</div>
-
 <!-- ================= QR MODAL ================= -->
 <div class="modal" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
   <div class="modal-box">
@@ -239,7 +234,10 @@
     <div class="center">
       <canvas id="qrCanvas" width="480" height="480" class="qr-canvas"></canvas>
       <p class="small muted mt8">Scan to call <b id="qrNumber"></b></p>
-      <button class="btn btn-primary btn-full" id="shareQrBtn">Save / share QR</button>
+      <div class="grid-2 mt8">
+        <button class="btn btn-primary" id="shareQrBtn">Save / share</button>
+        <button class="btn btn-ghost" id="printQrBtn">Print</button>
+      </div>
     </div>
   </div>
 </div>
@@ -252,9 +250,10 @@
       <button class="btn btn-ghost btn-sm" data-close-modal="cardModal" aria-label="Close">Close</button>
     </div>
     <canvas id="cardCanvas" width="1200" height="720" class="card-canvas"></canvas>
-    <div class="grid-2 mt8">
+    <div class="grid-3 mt8">
       <button class="btn btn-primary" id="cardJpgBtn">Save JPG</button>
       <button class="btn btn-ghost" id="cardPdfBtn">Save PDF</button>
+      <button class="btn btn-ghost" id="cardPrintBtn">Print</button>
     </div>
     <p class="small muted mt8">Print the card and place it on your dashboard so it is visible through the windshield.</p>
   </div>
@@ -262,10 +261,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<audio id="remoteAudio" autoplay playsinline></audio>
-
 <script src="lib/qrcode.js"></script>
-<script src="lib/peerjs.min.js"></script>
 <script src="lib/jspdf.umd.min.js"></script>
 <script src="app.js"></script>
 </body>

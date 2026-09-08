@@ -9,18 +9,46 @@ encrypted internet voice call with the owner — **the phone number is never sho
 | Version | 1.0 (versionCode 1) |
 | min / target / compile SDK | 24 / 36 / 36 |
 | Language | Java + bundled offline web UI (WebView) |
-| Build | Gradle 8.11.1, Android Gradle Plugin 8.9.1, JDK 17 |
+| Build | Gradle 8.14.5, Android Gradle Plugin 8.13.0, JDK 17 |
 
 ---
 
 ## Features
 
 * **My Garage** — add vehicles (number, type, nickname), stored only on the device.
-* **Go online / offline** — your vehicle number becomes a peer ID people can call.
-* **Call a vehicle** — type a vehicle number and talk over WebRTC HD voice.
-* **QR code + windshield card** — generated offline, saved/shared as JPG or PDF via the Android share sheet.
+* **Always online** — tap *Go online* once; a foreground service keeps the peer connection alive with
+  the app minimised, closed or the screen off, and restores it automatically after a reboot. It stays
+  online until you tap *Go offline*.
+* **Full-screen incoming calls** — calls ring over the lock screen with Accept / Decline, like a
+  normal phone call, and are answered natively (no need to open the app first).
+* **Missed-call notifications** — declined, unanswered or network-dropped calls leave a missed-call
+  notification with a tap-to-call-back action.
+* **Call a vehicle** — type a vehicle number and talk over WebRTC HD voice (Opus 48 kHz, in-band FEC,
+  echo cancellation and noise suppression on both directions).
+* **QR code + windshield card** — generated offline; **save, share or print** as JPG or PDF.
 * **Call history** — local only, clearable.
 * **Dark / light / system theme**, edge-to-edge, works on Android 7 – 16.
+
+### How always-online works
+
+```
+MainActivity (WebView UI)  ──commands──▶  CallService  (foreground service)
+        ▲                                      │  hosts a head-less WebView: assets/www/presence.html
+        └────── state pushes ──── CallBus ◀─────┘  which owns every PeerJS connection
+
+BootReceiver ──▶ CallService.sync()   (re-registers vehicles that were left online)
+CallActivity ◀── full-screen intent   (incoming ring / active call UI, works over the lock screen)
+```
+
+The service declares `specialUse` (standby presence, justified in the manifest) plus `microphone`,
+which is only relevant while a call is running and the call screen is in the foreground.
+Android may still stop the service on aggressive OEM skins — the app's **Settings → Always-online
+checklist** links directly to the microphone, notification and battery-optimisation screens so the
+user can set battery usage to *Unrestricted*.
+
+Because there is no push server, a missed-call notification can only be shown for calls that actually
+reached the device (i.e. it was online when the call came in). If the phone has no internet at all,
+the caller's website reports the owner as unreachable instead.
 
 ## Project layout
 
@@ -28,8 +56,14 @@ encrypted internet voice call with the owner — **the phone number is never sho
 app/
   src/main/java/com/datashield/vehiclecallalert/
       MainActivity.java     WebView host (WebViewAssetLoader, permissions, insets, back handling)
-      WebAppBridge.java     @JavascriptInterface: share file/text, call audio, keep screen on
-  src/main/assets/www/      the whole UI (index.html, styles.css, app.js)
+      WebAppBridge.java     @JavascriptInterface: state, presence commands, share, print, settings
+      CallService.java      foreground service: presence WebView, notifications, ringer, audio focus
+      CallActivity.java     full-screen incoming/active call screen (shows over the lock screen)
+      CallBus.java          in-process call-state bus (service → activities)
+      BootReceiver.java     restores online vehicles after reboot / app update
+      Prefs.java            local storage (vehicles, logs, online set, settings)
+  src/main/assets/www/      the UI (index.html, styles.css, app.js)
+  src/main/assets/www/presence.html + presence.js   head-less PeerJS layer run by CallService
   src/main/assets/www/lib/  bundled MIT libraries: peerjs, jspdf, qrcode-generator
   src/main/res/             icons (adaptive + legacy), themes, backup & network-security rules
 .github/workflows/          CI that builds the debug APK, release APK and release AAB
@@ -89,8 +123,12 @@ keyPassword=…
 
 * ✅ targets API 36 (required for new apps and updates from 31 Aug 2026)
 * ✅ Android App Bundle (`.aab`) output, R8 shrinking + `mapping.txt` for deobfuscated crash reports
-* ✅ only four permissions, each used by a visible feature; no location, contacts or storage access
+* ✅ every permission maps to a visible feature; no location, contacts or storage access
 * ✅ microphone opened only during a call, released immediately afterwards, nothing recorded
+* ✅ foreground-service types declared (`specialUse` + `microphone`) with an in-manifest justification;
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` deliberately **not** requested — the app opens the system
+  battery-optimisation screen instead
+* ✅ `USE_FULL_SCREEN_INTENT` used for incoming calls only (allowed for calling apps)
 * ✅ no cleartext traffic, network-security config included
 * ✅ no remotely loaded / interpreted code (all web assets bundled)
 * ✅ backup and data-extraction rules declared
@@ -99,6 +137,13 @@ keyPassword=…
 * ⚠️ Data safety form: declare **no data collected, no data shared**; microphone used for calls only,
   processed ephemerally.
 * ⚠️ Host `PRIVACY_POLICY.md` on a public URL (e.g. GitHub Pages) and paste that link into the Play Console.
+
+## Interoperability with the QR landing page
+
+The QR code and the shareable link point to the public call page with `?car_id=<PLATE>`, and the
+PeerJS ID the app registers is the **plain vehicle number** (A–Z and 0–9, uppercase). That is what the
+landing page calls, so scanning the code reaches the phone directly. The app answers with a live
+microphone stream, which is what makes the caller's page switch from *Ringing* to *Connected*.
 
 ## Third-party licences
 
