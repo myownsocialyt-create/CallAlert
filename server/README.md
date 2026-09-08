@@ -31,6 +31,9 @@ without it the app keeps using the always-connected foreground service.
 
 ## 2. Cloudflare Worker (10 minutes)
 
+> Prefer clicking to typing? Follow [`DASHBOARD-SETUP.md`](DASHBOARD-SETUP.md) instead — same
+> result, no command line.
+
 ```bash
 cd server/worker
 npm install                       # installs wrangler locally
