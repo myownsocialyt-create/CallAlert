@@ -65,6 +65,22 @@ connection — from that moment there is no permanent notification.
 
 ## 4. Patch the call page
 
+**The patched page is already in this repo: [`server/website/index.html`](website/index.html).**
+Open it, put your Worker URL in the one config line at the top of the script…
+
+```js
+const WAKE_SERVER = 'https://vehicle-call-alert-wake.<your-subdomain>.workers.dev';
+```
+
+…and upload it over the `index.html` of the call site (`datashield-cloud/Temp-call`). It keeps
+your existing design and adds: wake-push before dialling, retry-while-the-app-boots, a
+"vehicle not registered" message, missed-call reporting when the caller gives up, an online dot
+on the number plate, and the same HD-audio (Opus/FEC) tuning the app uses. With
+`WAKE_SERVER = ''` the page behaves exactly like the current one.
+
+<details>
+<summary>Alternative: patch your own page by hand with wake.js</summary>
+
 Copy `server/website/wake.js` next to your `index.html` and load it **before** your own script:
 
 ```html
@@ -104,6 +120,8 @@ try {
 
 `callWithWake` sends the push first and then retries `peer.call()` for ~25 seconds while the
 phone wakes up, so the old "Owner app not active" race disappears.
+
+</details>
 
 ## 5. How the pieces behave
 

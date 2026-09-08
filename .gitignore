@@ -16,3 +16,8 @@ keystore.properties
 *.jks
 *.keystore
 !gradle/wrapper/gradle-wrapper.jar
+
+# local test deps
+node_modules/
+tools/webtest/package-lock.json
+tools/webtest/package.json
