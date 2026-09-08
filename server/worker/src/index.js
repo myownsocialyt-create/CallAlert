@@ -7,9 +7,10 @@
  * Endpoints
  *   POST /register    { plate, token, platform }  -> remembers which phone owns a plate
  *   POST /unregister  { plate, token }            -> forgets it
+ *   POST /peer        { plate, token, peerId }     -> the id the phone answers calls on
  *   POST /ring        { plate }                   -> wakes that phone ("ring" push)
  *   POST /cancel      { plate }                   -> caller gave up (missed-call push)
- *   GET  /status?plate=XX                         -> { reachable: true|false }
+ *   GET  /status?plate=XX                         -> { reachable, peerId, awake }
  *   GET  /health
  *   GET  /diag                                    -> self-check: KV bound? secret valid?
  *
@@ -19,6 +20,8 @@
 
 const PLATE_RE = /^[A-Z0-9]{4,20}$/;
 const RING_COOLDOWN_SECONDS = 4;
+/** A published peer id is only meaningful while that socket is alive. */
+const PEER_TTL_SECONDS = 150;
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 180; // re-registered by the app on every launch
 
 export default {
@@ -41,6 +44,8 @@ export default {
           return cors(await register(request, env), request, env);
         case 'POST /unregister':
           return cors(await unregister(request, env), request, env);
+        case 'POST /peer':
+          return cors(await peer(request, env), request, env);
         case 'POST /ring':
           return cors(await ring(request, env, 'ring'), request, env);
         case 'POST /cancel':
@@ -83,7 +88,39 @@ async function unregister(request, env) {
     return json({ ok: true, plate, kept: true });
   }
   await env.TOKENS.delete(`plate:${plate}`);
+  await env.TOKENS.delete(`peer:${plate}`);
   return json({ ok: true, plate });
+}
+
+/**
+ * The phone tells us which PeerJS id it is listening on. It usually registers under the plate
+ * itself, but when the broker still holds a stale socket for that id the app takes a random
+ * one - publishing it here is what keeps calls connecting instead of ringing into the void.
+ */
+async function peer(request, env) {
+  const body = await readJson(request);
+  const plate = normalizePlate(body.plate);
+  const peerId = String(body.peerId || '').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+  const token = String(body.token || '').trim();
+  if (!plate) return json({ ok: false, error: 'bad_plate' }, 400);
+
+  const record = await readRecord(env, plate);
+  if (record && token && record.token !== token) {
+    // Somebody else's phone must not move a plate's calls to its own peer id.
+    return json({ ok: false, error: 'not_owner' }, 403);
+  }
+
+  if (!peerId) {
+    await env.TOKENS.delete(`peer:${plate}`);
+    return json({ ok: true, plate, cleared: true });
+  }
+
+  await env.TOKENS.put(
+    `peer:${plate}`,
+    JSON.stringify({ peerId, ts: Date.now() }),
+    { expirationTtl: PEER_TTL_SECONDS }
+  );
+  return json({ ok: true, plate, peerId });
 }
 
 /** Self-check used during setup: reports which pieces are configured, without leaking them. */
@@ -128,7 +165,16 @@ async function status(url, env) {
   const plate = normalizePlate(url.searchParams.get('plate'));
   if (!plate) return json({ ok: false, error: 'bad_plate' }, 400);
   const record = await readRecord(env, plate);
-  return json({ ok: true, plate, reachable: !!record });
+  const live = await readPeer(env, plate);
+  return json({
+    ok: true,
+    plate,
+    reachable: !!record,
+    // "awake" means the phone is connected to the signalling network right now.
+    awake: !!live,
+    peerId: live ? live.peerId : null,
+    peerAge: live ? Math.round((Date.now() - (live.ts || 0)) / 1000) : null
+  });
 }
 
 async function ring(request, env, type) {
@@ -158,6 +204,7 @@ async function ring(request, env, type) {
 
   if (result.unregistered) {
     await env.TOKENS.delete(`plate:${plate}`);
+    await env.TOKENS.delete(`peer:${plate}`);
     return json({ ok: false, error: 'not_registered', reachable: false }, 404);
   }
   if (!result.ok) {
@@ -278,6 +325,17 @@ async function readRecord(env, plate) {
   if (!raw) return null;
   try {
     return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function readPeer(env, plate) {
+  const raw = await env.TOKENS.get(`peer:${plate}`);
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw);
+    return value && value.peerId ? value : null;
   } catch (e) {
     return null;
   }

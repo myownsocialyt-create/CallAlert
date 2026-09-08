@@ -426,6 +426,9 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
     protected void onStart() {
         super.onStart();
         CallBus.get().addListener(this);
+        // While the app is on screen the vehicles stay connected, so an incoming call rings
+        // immediately instead of waiting for the push wake-up round trip.
+        CallService.foreground(this, true);
     }
 
     @Override
@@ -448,6 +451,7 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
     @Override
     protected void onStop() {
         CallBus.get().removeListener(this);
+        CallService.foreground(this, false);
         super.onStop();
     }
 

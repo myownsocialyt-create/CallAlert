@@ -144,6 +144,12 @@ npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 npx wrangler deploy
 ```
 
+### Updating the worker later
+
+The worker code changes when the app changes. To update: **Workers & Pages -> vehicle-alert ->
+Edit code -> Ctrl+A -> Delete -> paste `server/worker/worker.paste.js` -> Deploy.** Bindings and
+secrets are kept, so `/diag` should still answer `"ok": true` afterwards.
+
 ### After everything is green
 
 1. Upload [`server/website/index.html`](website/index.html) over the call site's `index.html`

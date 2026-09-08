@@ -72,6 +72,8 @@ public class CallService extends Service {
     public static final String ACTION_SPEAKER = "com.datashield.vehiclecallalert.SPEAKER";
     /** Sent by {@link PushService}: a caller is trying to reach this vehicle right now. */
     public static final String ACTION_WAKE = "com.datashield.vehiclecallalert.WAKE";
+    /** The app UI came to the front / went away: keep the vehicles instantly callable while open. */
+    public static final String ACTION_FOREGROUND = "com.datashield.vehiclecallalert.FOREGROUND";
     /** Sent by {@link PushService}: a call attempt that could not be delivered in time. */
     public static final String ACTION_MISSED = "com.datashield.vehiclecallalert.MISSED";
 
@@ -88,7 +90,7 @@ public class CallService extends Service {
     private static final int ID_MISSED_BASE = 2000;
 
     /** How long the service stays awake after a push before giving up on the call. */
-    private static final long WAKE_WINDOW_MS = 75_000L;
+    private static final long WAKE_WINDOW_MS = 90_000L;
     private static final long RING_TIMEOUT_MS = 45_000L;
     private static final String PRESENCE_URL =
             "https://appassets.androidplatform.net/assets/www/presence.html";
@@ -112,6 +114,8 @@ public class CallService extends Service {
     private boolean connectionLost;
     /** While a push wake-up window is open the service stays alive waiting for the call. */
     private long wakeUntilElapsed;
+    /** True while the app UI is on screen - presence is kept live so calls connect instantly. */
+    private boolean appForeground;
 
     private Ringtone ringtone;
     private Vibrator vibrator;
@@ -150,6 +154,15 @@ public class CallService extends Service {
     }
 
     /** Comes online for a few seconds so the caller's PeerJS call can arrive. */
+    /** Called by the UI: while the app is open every online vehicle stays connected. */
+    public static void foreground(Context context, boolean visible) {
+        if (Prefs.getOnline(context).isEmpty()) {
+            return; // nothing is switched on - no reason to start the service at all
+        }
+        send(context, new Intent(context, CallService.class)
+                .setAction(ACTION_FOREGROUND).putExtra(EXTRA_FLAG, visible));
+    }
+
     public static void wake(Context context, String number) {
         send(context, new Intent(context, CallService.class)
                 .setAction(ACTION_WAKE).putExtra(EXTRA_NUMBER, number));
@@ -216,8 +229,13 @@ public class CallService extends Service {
                 if (!TextUtils.isEmpty(number)) {
                     Prefs.setOnline(this, number, true);
                     if (PushRegistrar.isConfigured(this)) {
-                        // Push mode: the wake-up server keeps the vehicle reachable, no socket needed.
+                        // Push mode: the wake-up server keeps the vehicle reachable while the
+                        // app sleeps. With the app open we stay connected as well, so a call
+                        // placed right now rings without waiting for the push round trip.
                         PushRegistrar.register(this, number);
+                        if (appForeground) {
+                            sendJs("Presence.goOnline('" + number + "')");
+                        }
                     } else {
                         sendJs("Presence.goOnline('" + number + "')");
                     }
@@ -251,6 +269,19 @@ public class CallService extends Service {
                         sendJs("Presence.goOnline('" + number + "')");
                         main.postDelayed(this::stopIfIdle, WAKE_WINDOW_MS + 1000L);
                     }
+                }
+                break;
+            case ACTION_FOREGROUND:
+                appForeground = flag;
+                if (flag) {
+                    for (String plate : Prefs.getOnline(this)) {
+                        sendJs("Presence.goOnline('" + plate + "')");
+                    }
+                } else if (PushRegistrar.isConfigured(this)
+                        && CallBus.STATE_IDLE.equals(callState)
+                        && SystemClock.elapsedRealtime() >= wakeUntilElapsed) {
+                    // Push takes over again - drop the sockets so the phone can sleep.
+                    sendJs("Presence.goOfflineAll()");
                 }
                 break;
             case ACTION_MISSED:
@@ -494,8 +525,11 @@ public class CallService extends Service {
         }
 
         @android.webkit.JavascriptInterface
-        public void online(String number) {
+        public void online(String number, String peerId) {
+            final String plate = sanitize(number);
+            final String id = peerId == null ? "" : peerId;
             main.post(() -> {
+                PushRegistrar.publishPeer(CallService.this, plate, id);
                 CallBus.get().notifyDataChanged();
                 updatePresenceNotification();
             });
@@ -503,7 +537,9 @@ public class CallService extends Service {
 
         @android.webkit.JavascriptInterface
         public void offline(String number) {
+            final String plate = sanitize(number);
             main.post(() -> {
+                PushRegistrar.publishPeer(CallService.this, plate, "");
                 CallBus.get().notifyDataChanged();
                 updatePresenceNotification();
             });
@@ -511,13 +547,17 @@ public class CallService extends Service {
 
         @android.webkit.JavascriptInterface
         public void error(String number, String type, String message) {
+            final String plate = sanitize(number);
             main.post(() -> {
-                if ("unavailable-id".equals(type) && !TextUtils.isEmpty(number)) {
-                    Prefs.setOnline(CallService.this, number, false);
-                }
+                // "unavailable-id" only means the broker still holds the previous socket for
+                // this plate: presence.js retries and falls back to a random id, so the
+                // vehicle must stay switched on.
+                Prefs.setPeerError(CallService.this, plate, type == null ? "" : type);
                 CallBus.get().notifyDataChanged();
                 updatePresenceNotification();
-                if (!CallBus.STATE_IDLE.equals(callState) && !CallBus.STATE_ACTIVE.equals(callState)) {
+                // Only an outgoing attempt is aborted here. A hiccup on a listening peer must
+                // never tear down a call that is ringing or already connected.
+                if (CallBus.STATE_DIALING.equals(callState)) {
                     String status = "peer-unavailable".equals(type) ? "Owner offline" : "Call failed";
                     onCallEnded(callNumber, callDirection, status, 0);
                 }
@@ -1013,6 +1053,10 @@ public class CallService extends Service {
         }
         // Without push the service is the only thing keeping the vehicle reachable.
         if (!PushRegistrar.isConfigured(this) && !Prefs.getOnline(this).isEmpty()) {
+            return;
+        }
+        // With the app open we keep the peers connected so calls arrive instantly.
+        if (appForeground && !Prefs.getOnline(this).isEmpty()) {
             return;
         }
         stopForeground(STOP_FOREGROUND_REMOVE);

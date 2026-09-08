@@ -85,6 +85,84 @@ public final class PushRegistrar {
         post(context.getApplicationContext(), "unregister", plate);
     }
 
+    /**
+     * Tells the wake-up server which PeerJS id this vehicle is answering on right now.
+     *
+     * <p>The peer normally registers under the plate itself, but when the broker still holds a
+     * stale socket for that id the app takes a random one. Publishing it means the call page
+     * always knows where to dial, instead of ringing an id that nobody is listening on.</p>
+     */
+    public static void publishPeer(Context context, String plate, String peerId) {
+        final Context app = context.getApplicationContext();
+        final String cleanPlate = CallService.sanitize(plate);
+        final String cleanPeer = cleanPeerId(peerId);
+        if (cleanPlate.isEmpty()) {
+            return;
+        }
+        Prefs.setPeerId(app, cleanPlate, cleanPeer);
+        final String token = Prefs.getPushToken(app);
+        final String base = Prefs.getServerUrl(app);
+        if (TextUtils.isEmpty(token) || TextUtils.isEmpty(base)) {
+            return;
+        }
+        IO.execute(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("plate", cleanPlate);
+                body.put("token", token);
+                body.put("peerId", cleanPeer);
+                send(base, "peer", body);
+            } catch (Exception e) {
+                Log.w(TAG, "peer publish failed: " + e.getMessage());
+            }
+        });
+    }
+
+    /** PeerJS ids are plain identifiers - keep it that way before sending anything anywhere. */
+    private static String cleanPeerId(@Nullable String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length() && builder.length() < 64; i++) {
+            char c = value.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-' || c == '_';
+            if (ok) {
+                builder.append(c);
+            }
+        }
+        return builder.toString();
+    }
+
+    /** Blocking HTTPS POST of a JSON body. Runs on the IO executor only. */
+    private static void send(String base, String path, JSONObject body) throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(base.endsWith("/") ? base + path : base + "/" + path);
+            if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                return;
+            }
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/json");
+            try (OutputStream out = connection.getOutputStream()) {
+                out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            }
+            int code = connection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                Log.w(TAG, path + " failed with HTTP " + code);
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     private static void post(final Context app, final String path, final String plate) {
         final String token = Prefs.getPushToken(app);
         final String base = Prefs.getServerUrl(app);

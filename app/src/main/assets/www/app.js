@@ -489,6 +489,16 @@
     toast('All app data deleted.');
   }
 
+  var LINK_ERRORS = {
+    'unavailable-id': 'Reconnecting — the number was still held by the previous session',
+    'network': 'No internet connection',
+    'server-error': 'Call network unreachable, retrying…',
+    'socket-error': 'Call network unreachable, retrying…',
+    'socket-closed': 'Call network closed the connection, retrying…',
+    'browser-incompatible': 'This device cannot make WebRTC calls',
+    'engine': 'Calling engine failed to load — reinstall the app'
+  };
+
   function renderEnvironment() {
     var env = state.env || {};
     var inApp = !!bridge;
@@ -510,6 +520,27 @@
         rows.push(['Battery restrictions', env.batteryUnrestricted ? 'Unrestricted (recommended)'
           : 'Restricted — Android may close the connection', env.batteryUnrestricted ? null : 'Fix', 'battery']);
       }
+    }
+
+    // Per-vehicle connection state: this is what turns "it does not ring" into a diagnosis.
+    if (inApp) {
+      state.online.forEach(function (plate) {
+        var info = (state.link || {})[plate] || {};
+        var registered = (state.registered || []).indexOf(plate) >= 0;
+        var text;
+        if (info.peer) {
+          text = 'Reachable' + (info.peer === plate ? '' : ' (id ' + info.peer + ')');
+        } else if (info.err) {
+          text = LINK_ERRORS[info.err] || ('Connection problem: ' + info.err);
+        } else if (registered) {
+          text = 'Sleeping — will be woken by a push when someone calls';
+        } else if (env.pushServer) {
+          text = 'Registering with the wake-up server…';
+        } else {
+          text = 'Connecting…';
+        }
+        rows.push([plate, text, null, null]);
+      });
     }
 
     $('envList').innerHTML = rows.map(function (row) {

@@ -130,16 +130,112 @@ function boostAudio(sdp){
 const CALL_OPTIONS={ sdpTransform: boostAudio };
 
 /* ---------- calling ---------- */
+const RING_WINDOW_MS = 60000;   // how long we keep ringing the owner
+const WAKE_WAIT_MS   = 25000;   // how long we wait for the phone to come online
+let signalConn=null, signalState='', callTarget=null, giveUp=null;
+
+/** Asks the wake-up server where the phone is answering right now. */
+async function livePeerId(){
+  if(!WAKE_SERVER) return null;
+  try{
+    const r = await fetch(`${WAKE_SERVER}/status?plate=${encodeURIComponent(carId)}`,{cache:'no-store'});
+    const d = await r.json();
+    if(d && d.reachable) plateDot.classList.remove('off');
+    return (d && d.awake && d.peerId) ? d.peerId : null;
+  }catch(e){ return null; }
+}
+
+/** Waits until the owner's phone is connected to the call network. */
+async function waitForPhone(untilMs){
+  while(!cancelled && Date.now()<untilMs){
+    const id = await livePeerId();
+    if(id) return id;
+    await sleep(1200);
+  }
+  return null;
+}
+
+/** Small data channel used only for call signalling, so we show the true state. */
+function openSignal(target){
+  return new Promise(resolve=>{
+    let done=false;
+    const finish=v=>{ if(!done){ done=true; resolve(v); } };
+    let conn;
+    try{ conn = peer.connect(target,{reliable:true, serialization:'json'}); }
+    catch(e){ finish(null); return; }
+    if(!conn){ finish(null); return; }
+
+    const timer=setTimeout(()=>{ finish(null); }, 8000);
+    conn.on('open',()=>{ clearTimeout(timer); signalConn=conn; finish(conn); });
+    conn.on('error',()=>{ clearTimeout(timer); finish(null); });
+    conn.on('data', msg=>{
+      if(!msg || typeof msg!=='object') return;
+      signalState = msg.t || '';
+      if(msg.t==='ringing'){
+        setStatus('ringing','Ringing...',`The phone of ${carId} is ringing`);
+      }else if(msg.t==='answering'){
+        setStatus('connecting','Answering...','Owner picked up, connecting audio');
+      }else if(msg.t==='busy'){
+        setStatus('error','Owner is busy','The owner is already on another call.');
+        if(giveUp) giveUp('busy');
+      }else if(msg.t==='declined'){
+        setStatus('error','Call declined','The owner declined the call.');
+        if(giveUp) giveUp('declined');
+      }else if(msg.t==='ended' && !connected){
+        setStatus('error','No answer','The owner did not pick up.');
+        if(giveUp) giveUp('ended');
+      }
+    });
+    conn.on('close',()=>{ if(signalConn===conn) signalConn=null; });
+  });
+}
+
+function tellOwner(message){
+  if(signalConn && signalConn.open){
+    try{ signalConn.send(message); }catch(e){}
+  }
+}
+
+/** Places the media call and keeps it ringing - it is never cancelled behind the owner's back. */
+function placeCall(target, waitMs){
+  return new Promise(resolve=>{
+    let settled=false;
+    const finish=v=>{ if(settled) return; settled=true; clearTimeout(timer); attemptFail=null; resolve(v); };
+    attemptFail=()=>finish(false);          // peer-unavailable from the peer object
+    giveUp=()=>{ try{ call && call.close(); }catch(e){} finish('stop'); };
+
+    const call=peer.call(target, localStream, CALL_OPTIONS);
+    if(!call){ finish(false); return; }
+    currentCall=call;
+
+    const timer=setTimeout(()=>{ try{ call.close(); }catch(e){} finish(false); }, waitMs);
+
+    call.on('stream', s=>{
+      connected=true; currentCall=call;
+      remoteAudio.srcObject=s;
+      remoteAudio.volume=1.0;
+      remoteAudio.play().catch(()=>{});
+      setStatus('connected','Connected','Talking now');
+      callBtn.style.display='none'; controls.classList.add('active');
+      startTimer();
+      call.on('close', ()=>{ if(!cancelled){ setStatus('','Call Ended','Call finished'); } cleanup(); });
+      finish(true);
+    });
+    call.on('error', ()=>finish(false));
+    call.on('close', ()=>{ if(!connected) finish(false); });
+  });
+}
+
 async function startCall(){
   if(!carId){ alert('Add ?car_id=UP16AB1234 to URL'); return; }
-  connected=false; cancelled=false; lastPeerError=null;
+  connected=false; cancelled=false; lastPeerError=null; signalState=''; callTarget=null;
   try{
     callBtn.disabled=true; setStatus('connecting','Requesting mic','Please allow mic access...');
-    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}, video:false});
+    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1, sampleRate:48000}, video:false});
 
     // 1. wake the owner's phone (push) before dialling
     if(WAKE_SERVER){
-      setStatus('waking','Waking the owner’s phone','Sending a notification to the vehicle owner...');
+      setStatus('waking','Waking the owner\u2019s phone','Sending a notification to the vehicle owner...');
       const ring = await wakeServer('/ring',{plate:carId});
       if(ring && ring.ok===false && ring.error==='not_registered'){
         plateDot.classList.add('off');
@@ -154,30 +250,46 @@ async function startCall(){
       peer.on('open',resolve);
       peer.on('error',e=>{
         lastPeerError=e;
-        if(e && e.type==='peer-unavailable'){ if(attemptFail) attemptFail(); return; } // app not up yet: keep retrying
+        if(e && e.type==='peer-unavailable'){ if(attemptFail) attemptFail(); return; } // app not up yet
         reject(e);
       });
       setTimeout(()=>reject(new Error('Signalling server timeout')),15000);
     });
 
-    // 2. keep dialling while the app starts up (push takes a second or two)
-    const totalMs = WAKE_SERVER ? 30000 : 10000;
-    const deadline = Date.now()+totalMs;
+    // 2. wait until the phone is actually listening, then dial exactly where it listens
+    const deadline = Date.now()+RING_WINDOW_MS;
+    if(WAKE_SERVER){
+      setStatus('waking','Waking the owner\u2019s phone','This takes a few seconds if the phone was asleep...');
+      callTarget = await waitForPhone(Math.min(Date.now()+WAKE_WAIT_MS, deadline));
+    }
+    if(cancelled) return;
+    if(!callTarget) callTarget = carId;   // older app builds answer on the plate itself
+
+    // 3. handshake, then ring - and keep ringing while the owner walks to the phone
     setStatus('ringing','Ringing...',`Calling owner of ${carId}`);
+    await openSignal(callTarget);
+    if(cancelled) return;
+    if(signalConn){ setStatus('ringing','Ringing...',`The phone of ${carId} is ringing`); }
 
     while(!connected && !cancelled && Date.now()<deadline){
-      const ok = await dialOnce(4500);
-      if(ok || cancelled) break;
-      await sleep(600);
+      const left = deadline-Date.now();
+      // With a live handshake the phone is definitely there: give the owner the full window.
+      const result = await placeCall(callTarget, signalConn ? left : Math.min(6000,left));
+      if(result===true || result==='stop' || cancelled) break;
+      await sleep(800);
+      if(!connected && !cancelled && WAKE_SERVER){
+        const fresh = await livePeerId();
+        if(fresh && fresh!==callTarget){ callTarget=fresh; await openSignal(callTarget); }
+      }
     }
 
-    if(!connected && !cancelled){
+    if(!connected && !cancelled && !['declined','busy','ended'].includes(signalState)){
       await wakeServer('/cancel',{plate:carId});
       setStatus('error','No answer', WAKE_SERVER
-        ? 'The owner did not pick up — a missed call notification was sent.'
+        ? 'The owner did not pick up \u2014 a missed call notification was sent.'
         : 'Owner app not active.');
-      cleanup();
     }
+    if(!connected) cleanup();
   }catch(e){
     const msg = (e && e.name==='NotAllowedError') ? 'Allow mic'
               : (e && e.name==='NotFoundError') ? 'No mic'
@@ -187,40 +299,13 @@ async function startCall(){
   }
 }
 
-/** One dialling attempt. Resolves true when the owner picked up. */
-function dialOnce(waitMs){
-  return new Promise(resolve=>{
-    let settled=false;
-    const finish=v=>{ if(settled) return; settled=true; attemptFail=null; clearTimeout(timer); resolve(v); };
-    attemptFail=()=>finish(false);
-
-    const call=peer.call(carId, localStream, CALL_OPTIONS);
-    if(!call){ finish(false); return; }
-
-    const timer=setTimeout(()=>{ try{ call.close(); }catch(e){} finish(false); }, waitMs);
-
-    call.on('stream', s=>{
-      if(settled && !connected){ /* late stream: still accept it */ }
-      connected=true; currentCall=call;
-      remoteAudio.srcObject=s;
-      remoteAudio.play().catch(()=>{});
-      setStatus('connected','Connected','Talking now');
-      callBtn.style.display='none'; controls.classList.add('active');
-      startTimer();
-      call.on('close', ()=>{ if(!cancelled){ setStatus('','Call Ended','Call finished'); } cleanup(); });
-      finish(true);
-    });
-    call.on('error', ()=>finish(false));
-    call.on('close', ()=>{ if(!connected) finish(false); });
-  });
-}
-
 function cleanup(){
   stopTimer(); callBtn.disabled=false; callBtn.style.display='flex'; controls.classList.remove('active');
   if(currentCall){ try{currentCall.close()}catch(e){} }
+  if(signalConn){ try{signalConn.close()}catch(e){} }
   if(localStream){ localStream.getTracks().forEach(t=>t.stop()); }
   if(peer){ try{peer.destroy()}catch(e){} }
-  currentCall=localStream=peer=null; connected=false; attemptFail=null;
+  currentCall=localStream=peer=null; signalConn=null; connected=false; attemptFail=null; giveUp=null;
 }
 
 function init(){
@@ -236,12 +321,14 @@ function init(){
 callBtn.addEventListener('click',startCall);
 endBtn.addEventListener('click',()=>{
   cancelled=true;
+  tellOwner({t:'cancel'});
+  if(giveUp) giveUp('cancel');
   if(!connected && carId){ wakeServer('/cancel',{plate:carId}); }
   if(currentCall){ try{currentCall.close()}catch(e){} }
   setStatus('','Call Ended','Ended'); cleanup();
 });
 muteBtn.addEventListener('click',()=>{ if(!localStream)return; isMuted=!isMuted; localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted); muteBtn.textContent=isMuted?'🔇 Unmute':'🎙️ Mute'; });
-window.addEventListener('beforeunload',()=>{ if(!connected && carId && !cancelled){ wakeServer('/cancel',{plate:carId}); } });
+window.addEventListener('beforeunload',()=>{ if(!connected && carId && !cancelled){ tellOwner({t:'cancel'}); wakeServer('/cancel',{plate:carId}); } });
 init();
 </script>
 </body>

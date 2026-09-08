@@ -23,6 +23,7 @@ public final class Prefs {
     private static final String K_SETTINGS = "settings";
     private static final String K_PUSH_TOKEN = "push_token";
     private static final String K_PUSH_PLATES = "push_plates";
+    private static final String K_LINK = "link";
     private static final int MAX_LOGS = 100;
 
     /**
@@ -177,6 +178,53 @@ public final class Prefs {
         writeArray(context, K_PUSH_PLATES, new JSONArray(plates).toString());
     }
 
+    /* ----------------------------------------------------------------- link diagnostics */
+
+    /**
+     * Live connection state per vehicle: which peer id the vehicle is currently reachable on
+     * and the last error the signalling layer reported. Shown on the diagnostics screen so a
+     * user can tell "not set up" from "cannot reach the network" without a cable.
+     */
+    public static JSONObject getLinkState(Context context) {
+        String raw = prefs(context).getString(K_LINK, "{}");
+        try {
+            return new JSONObject(raw == null ? "{}" : raw);
+        } catch (JSONException e) {
+            return new JSONObject();
+        }
+    }
+
+    public static void setPeerId(Context context, String plate, String peerId) {
+        writeLink(context, plate, "peer", peerId == null ? "" : peerId, true);
+    }
+
+    public static void setPeerError(Context context, String plate, String type) {
+        writeLink(context, plate, "err", type == null ? "" : type, false);
+    }
+
+    private static void writeLink(Context context, String plate, String key, String value,
+                                  boolean clearError) {
+        if (plate == null || plate.isEmpty()) {
+            return;
+        }
+        try {
+            JSONObject all = getLinkState(context);
+            JSONObject entry = all.optJSONObject(plate);
+            if (entry == null) {
+                entry = new JSONObject();
+            }
+            entry.put(key, value);
+            entry.put("ts", System.currentTimeMillis());
+            if (clearError && !value.isEmpty()) {
+                entry.put("err", "");
+            }
+            all.put(plate, entry);
+            prefs(context).edit().putString(K_LINK, all.toString()).apply();
+        } catch (JSONException ignored) {
+            // never happens with plain values
+        }
+    }
+
     /* ----------------------------------------------------------------- misc */
 
     /** Full state snapshot handed to the web UI. */
@@ -188,6 +236,9 @@ public final class Prefs {
             state.put("online", new JSONArray(getOnline(context)));
             state.put("settings", getSettings(context));
             state.put("call", CallBus.get().snapshotJson());
+            state.put("link", getLinkState(context));
+            state.put("pushToken", !getPushToken(context).isEmpty());
+            state.put("registered", new JSONArray(getPushRegistered(context)));
         } catch (JSONException ignored) {
             // ignore
         }

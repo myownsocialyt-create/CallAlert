@@ -136,8 +136,25 @@ phone wakes up, so the old "Owner app not active" race disappears.
 | Vehicle never registered | `/ring` returns `not_registered` → the page says so immediately |
 | Firebase/server not configured | the app automatically falls back to the always-connected foreground service |
 
-## 6. What the server stores
+## 6. How a call finds the phone
 
-`PLATE → { fcm_token, platform, updated }` in Workers KV, plus a 4-second anti-spam marker per
-plate and a cached Google OAuth token. No phone numbers, no names, no call content, no logs of
-who called whom.
+The PeerJS broker sometimes still holds the previous socket for a plate, so the app cannot
+always register under the vehicle number itself. That is why the phone publishes the id it is
+actually answering on:
+
+```
+app  ->  POST /peer   { plate, token, peerId }      (kept for 150 s)
+page <-  GET  /status?plate=XX -> { reachable, awake, peerId }
+```
+
+The page waits until `awake` is true, dials `peerId`, opens a tiny data channel for
+signalling ("ringing" / "answering" / "accepted" / "declined") and only then rings - so it
+never cancels a call the owner is about to pick up, and it shows the true state instead of a
+permanent "Ringing...". Pages that predate this still work: without a published id they dial
+the plate and retry.
+
+## 7. What the server stores
+
+`PLATE → { fcm_token, platform, updated }` in Workers KV, the current PeerJS id
+(`peer:PLATE`, 150 s), a 4-second anti-spam marker per plate and a cached Google OAuth token.
+No phone numbers, no names, no call content, no logs of who called whom.
