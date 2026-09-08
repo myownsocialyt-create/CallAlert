@@ -59,7 +59,8 @@ android {
             }
         }
         debug {
-            applicationIdSuffix ".debug"
+            // No applicationIdSuffix: Firebase (google-services.json) is registered for the
+            // release package name only, and push wake-up must work in debug builds too.
             versionNameSuffix "-debug"
             minifyEnabled false
         }
