@@ -137,6 +137,7 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
             CallService.sync(this);
         }
 
+        PushRegistrar.refreshToken(this);
         handleCallBackIntent(getIntent());
     }
 
@@ -250,6 +251,8 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
             env.put("mic", hasMicPermission());
             env.put("notifications", hasNotificationPermission());
             env.put("batteryUnrestricted", isIgnoringBatteryOptimizations());
+            env.put("push", PushRegistrar.isConfigured(this));
+            env.put("pushServer", !Prefs.getServerUrl(this).isEmpty());
             state.put("env", env);
             return state.toString();
         } catch (JSONException e) {

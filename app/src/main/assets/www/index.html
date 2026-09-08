@@ -152,6 +152,12 @@
       <input id="linkBase" class="input" placeholder="https://example.com/call" autocomplete="off" spellcheck="false">
       <p class="small muted">The QR code opens this page with <code>?car_id=</code> and your vehicle number.
         Leave the default if you are unsure.</p>
+
+      <label class="label" for="serverBase">Instant wake-up server (optional)</label>
+      <input id="serverBase" class="input" placeholder="https://…workers.dev" autocomplete="off" spellcheck="false">
+      <p class="small muted">With a wake-up server the app is woken by a push only when someone calls,
+        so no permanent notification is needed. Leave empty to stay connected in the background instead.</p>
+
       <button class="btn btn-primary btn-full" id="saveSettingsBtn">Save settings</button>
     </div>
 

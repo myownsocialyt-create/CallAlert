@@ -21,6 +21,8 @@ public final class Prefs {
     private static final String K_LOGS = "logs";
     private static final String K_ONLINE = "online";
     private static final String K_SETTINGS = "settings";
+    private static final String K_PUSH_TOKEN = "push_token";
+    private static final String K_PUSH_PLATES = "push_plates";
     private static final int MAX_LOGS = 100;
 
     private Prefs() {
@@ -123,6 +125,50 @@ public final class Prefs {
         } catch (JSONException ignored) {
             // keep the previous value when the payload is malformed
         }
+    }
+
+    /** Wake-up server that turns a scanned QR code into a push message. */
+    public static String getServerUrl(Context context) {
+        String url = getSettings(context).optString("server", "").trim();
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        return url.startsWith("https://") ? url : "";
+    }
+
+    /* ----------------------------------------------------------------- push */
+
+    public static String getPushToken(Context context) {
+        return prefs(context).getString(K_PUSH_TOKEN, "");
+    }
+
+    public static void setPushToken(Context context, String token) {
+        prefs(context).edit().putString(K_PUSH_TOKEN, token == null ? "" : token).apply();
+    }
+
+    /** Vehicles the wake-up server currently knows about. */
+    public static List<String> getPushRegistered(Context context) {
+        List<String> result = new ArrayList<>();
+        JSONArray array = readArray(context, K_PUSH_PLATES);
+        for (int i = 0; i < array.length(); i++) {
+            String value = array.optString(i, "");
+            if (!value.isEmpty()) {
+                result.add(value);
+            }
+        }
+        return result;
+    }
+
+    public static void setPushRegistered(Context context, String plate, boolean registered) {
+        List<String> plates = getPushRegistered(context);
+        if (registered && !plates.contains(plate)) {
+            plates.add(plate);
+        } else if (!registered) {
+            plates.remove(plate);
+        } else {
+            return;
+        }
+        writeArray(context, K_PUSH_PLATES, new JSONArray(plates).toString());
     }
 
     /* ----------------------------------------------------------------- misc */

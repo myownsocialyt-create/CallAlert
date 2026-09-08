@@ -1,0 +1,13 @@
+{
+  "name": "vehicle-call-alert-wake",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Free Cloudflare Worker that wakes the Vehicle Call Alert app with an FCM push",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

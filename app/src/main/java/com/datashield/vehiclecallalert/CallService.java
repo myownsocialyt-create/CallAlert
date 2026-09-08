@@ -22,6 +22,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
@@ -69,6 +70,10 @@ public class CallService extends Service {
     public static final String ACTION_HANGUP = "com.datashield.vehiclecallalert.HANGUP";
     public static final String ACTION_MUTE = "com.datashield.vehiclecallalert.MUTE";
     public static final String ACTION_SPEAKER = "com.datashield.vehiclecallalert.SPEAKER";
+    /** Sent by {@link PushService}: a caller is trying to reach this vehicle right now. */
+    public static final String ACTION_WAKE = "com.datashield.vehiclecallalert.WAKE";
+    /** Sent by {@link PushService}: a call attempt that could not be delivered in time. */
+    public static final String ACTION_MISSED = "com.datashield.vehiclecallalert.MISSED";
 
     public static final String EXTRA_NUMBER = "number";
     public static final String EXTRA_FLAG = "flag";
@@ -82,6 +87,8 @@ public class CallService extends Service {
     private static final int ID_INCOMING = 1002;
     private static final int ID_MISSED_BASE = 2000;
 
+    /** How long the service stays awake after a push before giving up on the call. */
+    private static final long WAKE_WINDOW_MS = 75_000L;
     private static final long RING_TIMEOUT_MS = 45_000L;
     private static final String PRESENCE_URL =
             "https://appassets.androidplatform.net/assets/www/presence.html";
@@ -103,6 +110,8 @@ public class CallService extends Service {
     private boolean muted;
     private boolean speakerOn = true;
     private boolean connectionLost;
+    /** While a push wake-up window is open the service stays alive waiting for the call. */
+    private long wakeUntilElapsed;
 
     private Ringtone ringtone;
     private Vibrator vibrator;
@@ -138,6 +147,18 @@ public class CallService extends Service {
 
     public static void goOfflineAll(Context context) {
         send(context, new Intent(context, CallService.class).setAction(ACTION_GO_OFFLINE_ALL));
+    }
+
+    /** Comes online for a few seconds so the caller's PeerJS call can arrive. */
+    public static void wake(Context context, String number) {
+        send(context, new Intent(context, CallService.class)
+                .setAction(ACTION_WAKE).putExtra(EXTRA_NUMBER, number));
+    }
+
+    /** Records a call attempt that arrived too late to be answered. */
+    public static void missedCall(Context context, String number) {
+        send(context, new Intent(context, CallService.class)
+                .setAction(ACTION_MISSED).putExtra(EXTRA_NUMBER, number));
     }
 
     public static void placeCall(Context context, String number) {
@@ -194,21 +215,50 @@ public class CallService extends Service {
             case ACTION_GO_ONLINE:
                 if (!TextUtils.isEmpty(number)) {
                     Prefs.setOnline(this, number, true);
-                    sendJs("Presence.goOnline('" + number + "')");
+                    if (PushRegistrar.isConfigured(this)) {
+                        // Push mode: the wake-up server keeps the vehicle reachable, no socket needed.
+                        PushRegistrar.register(this, number);
+                    } else {
+                        sendJs("Presence.goOnline('" + number + "')");
+                    }
                     CallBus.get().notifyDataChanged();
                 }
                 break;
             case ACTION_GO_OFFLINE:
                 if (!TextUtils.isEmpty(number)) {
                     Prefs.setOnline(this, number, false);
+                    PushRegistrar.unregister(this, number);
                     sendJs("Presence.goOffline('" + number + "')");
                     CallBus.get().notifyDataChanged();
                 }
                 break;
             case ACTION_GO_OFFLINE_ALL:
+                for (String plate : Prefs.getOnline(this)) {
+                    PushRegistrar.unregister(this, plate);
+                }
                 Prefs.clearOnline(this);
                 sendJs("Presence.goOfflineAll()");
                 CallBus.get().notifyDataChanged();
+                break;
+            case ACTION_WAKE:
+                if (!TextUtils.isEmpty(number)) {
+                    wakeUntilElapsed = SystemClock.elapsedRealtime() + WAKE_WINDOW_MS;
+                    if (!Prefs.isOnline(this, number)) {
+                        // The vehicle was switched off in the meantime.
+                        Prefs.setOnline(this, number, false);
+                        PushRegistrar.unregister(this, number);
+                    } else {
+                        sendJs("Presence.goOnline('" + number + "')");
+                        main.postDelayed(this::stopIfIdle, WAKE_WINDOW_MS + 1000L);
+                    }
+                }
+                break;
+            case ACTION_MISSED:
+                if (!TextUtils.isEmpty(number)) {
+                    Prefs.addLog(this, number, "incoming", "Missed (phone offline)", 0);
+                    showMissedCallNotification(number, "Missed (phone offline)");
+                    CallBus.get().notifyDataChanged();
+                }
                 break;
             case ACTION_CALL:
                 if (!TextUtils.isEmpty(number)) {
@@ -328,6 +378,10 @@ public class CallService extends Service {
     }
 
     private void syncOnlineVehicles() {
+        if (PushRegistrar.isConfigured(this)) {
+            PushRegistrar.registerAll(this);
+            return;
+        }
         for (String number : Prefs.getOnline(this)) {
             sendJs("Presence.goOnline('" + number + "')");
         }
@@ -950,10 +1004,15 @@ public class CallService extends Service {
     }
 
     private void stopIfIdle() {
-        if (!Prefs.getOnline(this).isEmpty()) {
+        if (!CallBus.STATE_IDLE.equals(callState) && !CallBus.STATE_ENDED.equals(callState)) {
             return;
         }
-        if (!CallBus.STATE_IDLE.equals(callState) && !CallBus.STATE_ENDED.equals(callState)) {
+        if (SystemClock.elapsedRealtime() < wakeUntilElapsed) {
+            // Waiting for the call that the push message announced.
+            return;
+        }
+        // Without push the service is the only thing keeping the vehicle reachable.
+        if (!PushRegistrar.isConfigured(this) && !Prefs.getOnline(this).isEmpty()) {
             return;
         }
         stopForeground(STOP_FOREGROUND_REMOVE);

@@ -1,0 +1,17 @@
+name = "vehicle-call-alert-wake"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Free Workers KV namespace. Create it once with:
+#   npx wrangler kv namespace create TOKENS
+# then paste the printed id below.
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Comma separated list of sites allowed to call /ring, or "*" while testing.
+ALLOWED_ORIGINS = "*"
+
+# Secret (never put it in this file):
+#   npx wrangler secret put FIREBASE_SERVICE_ACCOUNT

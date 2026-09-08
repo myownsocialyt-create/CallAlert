@@ -2,6 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
+// Push wake-up is optional: drop app/google-services.json into the project to enable it.
+def firebaseConfig = file("google-services.json")
+if (firebaseConfig.exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 // Optional release signing.
 // Provide either a keystore.properties file in the project root (never commit it)
 // or the matching environment variables (used by CI).
@@ -88,4 +94,8 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.14.0'
     implementation 'androidx.print:print:1.0.0'
     implementation 'com.google.android.material:material:1.13.0'
+
+    // Wakes the app for an incoming call without keeping a permanent connection.
+    // Harmless when google-services.json is missing: the app then uses the foreground service.
+    implementation 'com.google.firebase:firebase-messaging:24.1.0'
 }

@@ -29,6 +29,16 @@ encrypted internet voice call with the owner — **the phone number is never sho
 * **Call history** — local only, clearable.
 * **Dark / light / system theme**, edge-to-edge, works on Android 7 – 16.
 
+### Two ways of receiving calls
+
+| Mode | When it is used | Trade-off |
+|---|---|---|
+| **Instant wake-up (recommended)** | a Firebase config (`app/google-services.json`) **and** a wake-up server URL are set | no permanent notification; the app sleeps and a high-priority push wakes it when someone scans the QR code. Setup: [`server/README.md`](server/README.md) |
+| **Always-connected fallback** | no Firebase / no server configured | a foreground service keeps the PeerJS connection open, with a permanent notification |
+
+Both modes end in the same place: `CallService` connects the call and `CallActivity` rings full
+screen. The app switches automatically — nothing to toggle.
+
 ### How always-online works
 
 ```
@@ -37,6 +47,7 @@ MainActivity (WebView UI)  ──commands──▶  CallService  (foreground ser
         └────── state pushes ──── CallBus ◀─────┘  which owns every PeerJS connection
 
 BootReceiver ──▶ CallService.sync()   (re-registers vehicles that were left online)
+PushService  ──▶ CallService.wake()   (FCM high-priority push: come online for one call)
 CallActivity ◀── full-screen intent   (incoming ring / active call UI, works over the lock screen)
 ```
 
@@ -46,9 +57,9 @@ Android may still stop the service on aggressive OEM skins — the app's **Setti
 checklist** links directly to the microphone, notification and battery-optimisation screens so the
 user can set battery usage to *Unrestricted*.
 
-Because there is no push server, a missed-call notification can only be shown for calls that actually
-reached the device (i.e. it was online when the call came in). If the phone has no internet at all,
-the caller's website reports the owner as unreachable instead.
+In the always-connected fallback a missed-call notification can only be shown for calls that actually
+reached the device. With the wake-up server the push is queued by Google while the phone is offline,
+so the missed call is reported as soon as the phone comes back online.
 
 ## Project layout
 
@@ -61,9 +72,15 @@ app/
       CallActivity.java     full-screen incoming/active call screen (shows over the lock screen)
       CallBus.java          in-process call-state bus (service → activities)
       BootReceiver.java     restores online vehicles after reboot / app update
-      Prefs.java            local storage (vehicles, logs, online set, settings)
+      Prefs.java            local storage (vehicles, logs, online set, settings, push token)
+      PushService.java      FCM receiver: wake for a call, or show a late/missed call
+      PushRegistrar.java    registers "plate -> push token" with the wake-up server
   src/main/assets/www/      the UI (index.html, styles.css, app.js)
   src/main/assets/www/presence.html + presence.js   head-less PeerJS layer run by CallService
+server/worker/            free Cloudflare Worker that turns a QR scan into an FCM push
+server/website/wake.js    drop-in helper for the public call page
+tools/preview/            HTML preview of the full-screen call design
+tools/webtest/            jsdom smoke test for the bundled web UI
   src/main/assets/www/lib/  bundled MIT libraries: peerjs, jspdf, qrcode-generator
   src/main/res/             icons (adaptive + legacy), themes, backup & network-security rules
 .github/workflows/          CI that builds the debug APK, release APK and release AAB

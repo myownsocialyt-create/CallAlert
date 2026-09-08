@@ -78,6 +78,7 @@
       : { app: !!bridge, mic: false, notifications: false, batteryUnrestricted: false };
     if (!state.settings.link) { state.settings.link = DEFAULT_LINK; }
     if (!state.settings.theme) { state.settings.theme = 'system'; }
+    if (typeof state.settings.server !== 'string') { state.settings.server = ''; }
   }
 
   function loadState() {
@@ -459,8 +460,15 @@
       toast('The QR link must start with https://');
       return;
     }
+    var server = ($('serverBase').value || '').trim().replace(/\/+$/, '');
+    if (server && !/^https:\/\/[^\s]+$/i.test(server)) {
+      toast('The wake-up server URL must start with https://');
+      return;
+    }
     state.settings.link = value || DEFAULT_LINK;
+    state.settings.server = server;
     $('linkBase').value = state.settings.link;
+    $('serverBase').value = server;
     persistSettings();
     toast('Settings saved.');
   }
@@ -492,8 +500,15 @@
         env.mic ? null : 'Allow', 'permissions']);
       rows.push(['Call notifications', env.notifications ? 'Allowed' : 'Not allowed — you will not see incoming calls',
         env.notifications ? null : 'Allow', 'notifications']);
-      rows.push(['Battery restrictions', env.batteryUnrestricted ? 'Unrestricted (recommended)'
-        : 'Restricted — Android may close the connection', env.batteryUnrestricted ? null : 'Fix', 'battery']);
+      if (env.push) {
+        rows.push(['Delivery mode', 'Instant wake-up (push) — no permanent notification', null, null]);
+      } else if (env.pushServer) {
+        rows.push(['Delivery mode', 'Wake-up server set, waiting for the push token', null, null]);
+      } else {
+        rows.push(['Delivery mode', 'Always-connected background service (permanent notification)', null, null]);
+        rows.push(['Battery restrictions', env.batteryUnrestricted ? 'Unrestricted (recommended)'
+          : 'Restricted — Android may close the connection', env.batteryUnrestricted ? null : 'Fix', 'battery']);
+      }
     }
 
     $('envList').innerHTML = rows.map(function (row) {
@@ -528,6 +543,7 @@
   function renderAll() {
     applyTheme(state.settings.theme || 'system');
     $('linkBase').value = state.settings.link || DEFAULT_LINK;
+    $('serverBase').value = state.settings.server || '';
     renderVehicles();
     renderLogs();
     renderEnvironment();

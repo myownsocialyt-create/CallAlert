@@ -20,7 +20,15 @@ public class BootReceiver extends BroadcastReceiver {
             case Intent.ACTION_LOCKED_BOOT_COMPLETED:
             case Intent.ACTION_MY_PACKAGE_REPLACED:
             case "android.intent.action.QUICKBOOT_POWERON":
-                if (!Prefs.getOnline(context).isEmpty()) {
+                if (Prefs.getOnline(context).isEmpty()) {
+                    break;
+                }
+                if (PushRegistrar.isConfigured(context)) {
+                    // Push mode needs no connection at all - just make sure the wake-up
+                    // server still has a valid token for this device.
+                    PushRegistrar.refreshToken(context);
+                    PushRegistrar.registerAll(context);
+                } else {
                     CallService.sync(context);
                 }
                 break;
