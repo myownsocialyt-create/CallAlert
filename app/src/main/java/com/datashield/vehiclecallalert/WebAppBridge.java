@@ -226,6 +226,10 @@ public class WebAppBridge {
             return;
         }
         activity.runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                openAppSettings();
+                return;
+            }
             try {
                 Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());

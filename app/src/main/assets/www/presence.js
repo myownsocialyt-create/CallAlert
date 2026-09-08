@@ -369,7 +369,8 @@
     },
 
     rejectBusy: function () {
-      if (current) {
+      // Only ever drops a call that is still ringing — never the one in progress.
+      if (current && current.pending) {
         finish('Missed (busy)', 'incoming', current.number);
       }
     },

@@ -585,10 +585,8 @@ public class CallService extends Service {
                     type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
                 }
                 startForeground(ID_PRESENCE, notification, type);
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(ID_PRESENCE, notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
             } else {
+                // Below Android 14 the types declared in the manifest are used automatically.
                 startForeground(ID_PRESENCE, notification);
             }
             started = true;
@@ -777,9 +775,20 @@ public class CallService extends Service {
                 return;
             }
             long[] pattern = {0, 700, 900};
-            vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+            } else {
+                vibrateLegacy(pattern);
+            }
         } catch (Exception ignored) {
             // vibration is optional
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void vibrateLegacy(long[] pattern) {
+        if (vibrator != null) {
+            vibrator.vibrate(pattern, 0);
         }
     }
 
