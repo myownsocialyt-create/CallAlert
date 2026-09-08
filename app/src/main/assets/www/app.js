@@ -198,7 +198,14 @@
     $('newNumber').value = '';
     $('newNick').value = '';
     renderVehicles();
-    toast('Vehicle added.');
+
+    // Go online straight away: the user should never have to switch it on again.
+    if (bridge && bridge.goOnline) {
+      bridge.goOnline(number);
+      toast('Vehicle added — going online.');
+    } else {
+      toast('Vehicle added.');
+    }
   }
 
   function deleteVehicle(number) {

@@ -71,6 +71,9 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
     private int insetBottomPx = 0;
     private boolean pageReady = false;
 
+    /** Sent by the missed-call notification: open the app and ring that vehicle back. */
+    public static final String ACTION_CALL_BACK = "com.datashield.vehiclecallalert.CALL_BACK";
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -132,6 +135,26 @@ public class MainActivity extends AppCompatActivity implements CallBus.Listener 
         // Vehicles that were left online must come back online when the app is opened.
         if (!Prefs.getOnline(this).isEmpty()) {
             CallService.sync(this);
+        }
+
+        handleCallBackIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(@NonNull Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleCallBackIntent(intent);
+    }
+
+    private void handleCallBackIntent(@Nullable Intent intent) {
+        if (intent == null || !ACTION_CALL_BACK.equals(intent.getAction())) {
+            return;
+        }
+        String number = CallService.sanitize(intent.getStringExtra(CallService.EXTRA_NUMBER));
+        intent.setAction(null);
+        if (!number.isEmpty()) {
+            requestCall(number);
         }
     }
 

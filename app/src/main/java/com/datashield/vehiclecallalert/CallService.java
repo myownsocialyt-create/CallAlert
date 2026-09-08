@@ -619,8 +619,11 @@ public class CallService extends Service {
             text = getString(R.string.notif_online_desc, TextUtils.join(", ", online));
         }
 
-        PendingIntent open = PendingIntent.getActivity(this, 0,
-                new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        boolean inCall = !CallBus.STATE_IDLE.equals(callState) && !CallBus.STATE_ENDED.equals(callState);
+        Intent target = inCall
+                ? CallActivity.intent(this, CallBus.STATE_INCOMING.equals(callState))
+                : new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent open = PendingIntent.getActivity(this, inCall ? 1 : 0, target,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CH_PRESENCE)
@@ -702,6 +705,16 @@ public class CallService extends Service {
                 new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        // Calling back needs a foreground activity (microphone + Play policy), so the action
+        // opens the app with the number pre-loaded instead of dialling from the background.
+        PendingIntent callBack = PendingIntent.getActivity(this,
+                31 + Math.abs(number.hashCode() % 400),
+                new Intent(this, MainActivity.class)
+                        .setAction(MainActivity.ACTION_CALL_BACK)
+                        .putExtra(EXTRA_NUMBER, number)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CH_MISSED)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(getString(R.string.notif_missed_title))
@@ -710,7 +723,8 @@ public class CallService extends Service {
                         .bigText(getString(R.string.notif_missed_big, number, status)))
                 .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
                 .setAutoCancel(true)
-                .setContentIntent(open);
+                .setContentIntent(open)
+                .addAction(0, getString(R.string.action_call_back), callBack);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ContextCompat.checkSelfPermission(this, "android.permission.POST_NOTIFICATIONS")

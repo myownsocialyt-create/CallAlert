@@ -9,7 +9,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -30,11 +31,17 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
 
     private TextView plateView;
     private TextView statusView;
+    private TextView subtitleView;
     private TextView timerView;
+    private TextView muteLabel;
+    private TextView speakerLabel;
     private LinearLayout incomingActions;
     private LinearLayout activeActions;
-    private Button muteButton;
-    private Button speakerButton;
+    private ImageButton muteButton;
+    private ImageButton speakerButton;
+    private View pulseOne;
+    private View pulseTwo;
+    private boolean pulsing;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long startedAt;
@@ -73,11 +80,16 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
 
         plateView = findViewById(R.id.callPlate);
         statusView = findViewById(R.id.callStatus);
+        subtitleView = findViewById(R.id.callSubtitle);
         timerView = findViewById(R.id.callTimer);
+        muteLabel = findViewById(R.id.muteLabel);
+        speakerLabel = findViewById(R.id.speakerLabel);
         incomingActions = findViewById(R.id.incomingActions);
         activeActions = findViewById(R.id.activeActions);
         muteButton = findViewById(R.id.muteButton);
         speakerButton = findViewById(R.id.speakerButton);
+        pulseOne = findViewById(R.id.pulseOne);
+        pulseTwo = findViewById(R.id.pulseTwo);
 
         findViewById(R.id.acceptButton).setOnClickListener(v ->
                 CallService.simpleAction(this, CallService.ACTION_ACCEPT));
@@ -88,15 +100,13 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
 
         muteButton.setOnClickListener(v -> {
             boolean next = !muteButton.isSelected();
-            muteButton.setSelected(next);
-            muteButton.setText(next ? R.string.action_unmute : R.string.action_mute);
+            applyMuteUi(next);
             CallService.flagAction(this, CallService.ACTION_MUTE, next);
         });
 
         speakerButton.setOnClickListener(v -> {
             boolean speakerOn = !speakerButton.isSelected();
-            speakerButton.setSelected(speakerOn);
-            speakerButton.setText(speakerOn ? R.string.action_speaker_on : R.string.action_speaker_off);
+            applySpeakerUi(speakerOn);
             CallService.flagAction(this, CallService.ACTION_SPEAKER, speakerOn);
         });
 
@@ -106,6 +116,57 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
                 moveTaskToBack(true);
             }
         });
+    }
+
+    private void applyMuteUi(boolean muted) {
+        muteButton.setSelected(muted);
+        muteButton.setImageResource(muted ? R.drawable.ic_mic_off : R.drawable.ic_mic_on);
+        muteButton.setContentDescription(getString(muted ? R.string.action_unmute : R.string.action_mute));
+        muteLabel.setText(muted ? R.string.action_unmute : R.string.action_mute);
+    }
+
+    private void applySpeakerUi(boolean speakerOn) {
+        speakerButton.setSelected(speakerOn);
+        speakerButton.setImageResource(speakerOn ? R.drawable.ic_speaker_on : R.drawable.ic_speaker_off);
+        speakerButton.setContentDescription(
+                getString(speakerOn ? R.string.action_speaker_on : R.string.action_speaker_off));
+        speakerLabel.setText(speakerOn ? R.string.action_speaker_on : R.string.action_speaker_off);
+    }
+
+    /** Soft "radar" rings behind the vehicle avatar while the call is ringing or connecting. */
+    private void startPulse() {
+        if (pulsing) {
+            return;
+        }
+        pulsing = true;
+        pulseOne.setVisibility(View.VISIBLE);
+        pulseTwo.setVisibility(View.VISIBLE);
+        animatePulse(pulseOne, 0L);
+        animatePulse(pulseTwo, 900L);
+    }
+
+    private void animatePulse(final View view, long delay) {
+        if (!pulsing) {
+            return;
+        }
+        view.setScaleX(0.65f);
+        view.setScaleY(0.65f);
+        view.setAlpha(0.9f);
+        view.animate()
+                .scaleX(1f).scaleY(1f).alpha(0f)
+                .setStartDelay(delay)
+                .setDuration(1800L)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .withEndAction(() -> animatePulse(view, 0L))
+                .start();
+    }
+
+    private void stopPulse() {
+        pulsing = false;
+        pulseOne.animate().cancel();
+        pulseTwo.animate().cancel();
+        pulseOne.setVisibility(View.INVISIBLE);
+        pulseTwo.setVisibility(View.INVISIBLE);
     }
 
     private void showOverLockScreen() {
@@ -135,6 +196,7 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
     protected void onStop() {
         CallBus.get().removeListener(this);
         handler.removeCallbacks(ticker);
+        stopPulse();
         super.onStop();
     }
 
@@ -143,36 +205,43 @@ public class CallActivity extends AppCompatActivity implements CallBus.Listener 
         plateView.setText(snapshot.number);
         startedAt = snapshot.startedAt;
 
-        muteButton.setSelected(snapshot.muted);
-        muteButton.setText(snapshot.muted ? R.string.action_unmute : R.string.action_mute);
-        speakerButton.setSelected(snapshot.speakerOn);
-        speakerButton.setText(snapshot.speakerOn ? R.string.action_speaker_on : R.string.action_speaker_off);
+        applyMuteUi(snapshot.muted);
+        applySpeakerUi(snapshot.speakerOn);
 
         switch (snapshot.state) {
             case CallBus.STATE_INCOMING:
                 statusView.setText(R.string.call_incoming);
+                subtitleView.setText(R.string.call_privacy_note);
                 incomingActions.setVisibility(View.VISIBLE);
                 activeActions.setVisibility(View.GONE);
                 timerView.setVisibility(View.GONE);
+                startPulse();
                 break;
             case CallBus.STATE_DIALING:
                 statusView.setText(snapshot.message.isEmpty()
                         ? getString(R.string.call_connecting) : snapshot.message);
+                subtitleView.setText(R.string.call_outgoing_note);
                 incomingActions.setVisibility(View.GONE);
                 activeActions.setVisibility(View.VISIBLE);
                 timerView.setVisibility(View.GONE);
+                startPulse();
                 break;
             case CallBus.STATE_ACTIVE:
                 statusView.setText(R.string.call_connected);
+                subtitleView.setText(R.string.call_hd_note);
                 incomingActions.setVisibility(View.GONE);
                 activeActions.setVisibility(View.VISIBLE);
                 timerView.setVisibility(View.VISIBLE);
+                stopPulse();
                 break;
             default:
                 statusView.setText(snapshot.message.isEmpty()
                         ? getString(R.string.call_ended) : snapshot.message);
+                subtitleView.setText("");
                 incomingActions.setVisibility(View.GONE);
                 activeActions.setVisibility(View.GONE);
+                timerView.setVisibility(View.GONE);
+                stopPulse();
                 if (!finishing) {
                     finishing = true;
                     handler.postDelayed(this::finishAndRemoveTask, 1200L);
