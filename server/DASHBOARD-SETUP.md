@@ -29,10 +29,31 @@ credit card. Firebase stays on the free Spark plan.
    → **Get started**.
 3. Name it exactly: `vehicle-call-alert-wake` → **Deploy**.
 4. Click **Edit code** (or **</> Edit code** on the worker page).
-5. Delete everything in the editor and paste the **entire content** of
-   [`server/worker/src/index.js`](worker/src/index.js) from this repository
-   (GitHub → open the file → *Copy raw file* button).
-6. Click **Deploy** (top right).
+5. The editor shows **one** file — usually `worker.js` (sometimes `index.js`) — containing the
+   Hello World sample:
+
+   ```js
+   export default {
+     async fetch(request, env, ctx) {
+       return new Response('Hello World!');
+     },
+   };
+   ```
+
+   Click inside it, press **Ctrl+A** (Cmd+A on Mac) and **Delete** so the file is empty.
+6. Paste the **entire content** of [`server/worker/src/index.js`](worker/src/index.js) from this
+   repository (GitHub → open the file → *Copy raw file* button).
+
+   * Keep the existing file name (`worker.js` is fine) — the name does not matter.
+   * Do **not** create a second file: two `export default` blocks in one worker is an error.
+   * Do **not** paste `wrangler.toml` anywhere; in the dashboard those settings are the KV
+     binding (step 3) and the secret (step 4).
+   * After pasting, the first line should read `/**` followed by
+     `* Vehicle Call Alert — wake-up server.`
+7. Click **Deploy** (top right). Visiting the URL now may show an error until steps 3 and 4 are
+   done — that is expected; `/health` already works.
+8. Whenever you add the binding or the secret afterwards, press **Deploy** again so the running
+   version picks them up.
 
 At this point the worker page shows its address, something like:
 
