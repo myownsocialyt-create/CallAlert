@@ -162,6 +162,20 @@ PeerJS ID the app registers is the **plain vehicle number** (A–Z and 0–9, up
 landing page calls, so scanning the code reaches the phone directly. The app answers with a live
 microphone stream, which is what makes the caller's page switch from *Ringing* to *Connected*.
 
+## Google Play declarations you must fill in
+
+The code is policy-compliant, but the Play Console asks you to *declare* three things:
+
+| Console section | Answer |
+|---|---|
+| **Foreground service types** → `specialUse` | "Voice-over-IP presence: the app keeps a peer-to-peer connection open so the vehicle owner can receive calls started by scanning a QR code, on devices where push wake-up is unavailable. Video: show the app going online and receiving a call." |
+| **Full-screen intent** (`USE_FULL_SCREEN_INTENT`) | "Calling app: incoming voice calls ring on the lock screen with Accept/Decline." |
+| **Data safety** | No data collected, no data shared. Microphone: used for calls only, processed ephemerally, not stored. |
+
+Also required before the first release: a signed AAB (repository secrets `KEYSTORE_BASE64`,
+`KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), the privacy policy hosted on a public URL,
+a store listing with screenshots, and the 512x512 icon from `store-assets/`.
+
 ## Third-party licences
 
 * [PeerJS](https://peerjs.com) — MIT

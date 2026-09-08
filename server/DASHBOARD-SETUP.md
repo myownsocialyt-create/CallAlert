@@ -144,6 +144,23 @@ npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 npx wrangler deploy
 ```
 
+### After everything is green
+
+1. Upload [`server/website/index.html`](website/index.html) over the call site's `index.html`
+   (it already points at your worker). **This is required** - once the app runs in push mode,
+   the old page cannot reach a sleeping phone.
+2. Install the new APK, add your vehicle, then open
+   `https://vehicle-alert.techeditz8.workers.dev/status?plate=YOURPLATE` -
+   it must say `"reachable":true`. That proves the phone registered itself.
+3. Lock the phone, close the app completely, and call from another device.
+
+Two things that still break push (they are Android limits, not bugs):
+
+* **Force stop.** If the user force-stops the app from Android settings, no push is delivered
+  until the app is opened once again.
+* **Aggressive battery managers** (Xiaomi, Oppo, Vivo, realme...) may delay pushes. The app's
+  Settings screen links to the battery-optimisation page so the user can set it to Unrestricted.
+
 ### Don't want to do this at all?
 
 That's fine — the app already works without it. You keep the always-connected mode: calls arrive
