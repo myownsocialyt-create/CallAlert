@@ -80,6 +80,7 @@
     if (!state.settings.link) { state.settings.link = DEFAULT_LINK; }
     if (!state.settings.theme) { state.settings.theme = 'system'; }
     if (typeof state.settings.server !== 'string') { state.settings.server = DEFAULT_SERVER; }
+    if (state.settings.mode !== 'always') { state.settings.mode = 'auto'; }
   }
 
   function loadState() {
@@ -468,10 +469,14 @@
     }
     state.settings.link = value || DEFAULT_LINK;
     state.settings.server = server;
+    state.settings.mode = $('modeSelect').value === 'always' ? 'always' : 'auto';
     $('linkBase').value = state.settings.link;
     $('serverBase').value = server;
     persistSettings();
-    toast('Settings saved.');
+    renderEnvironment();
+    toast(state.settings.mode === 'always'
+      ? 'Saved. The vehicles now stay connected all the time.'
+      : 'Settings saved.');
   }
 
   function wipeData() {
@@ -511,7 +516,11 @@
         env.mic ? null : 'Allow', 'permissions']);
       rows.push(['Call notifications', env.notifications ? 'Allowed' : 'Not allowed — you will not see incoming calls',
         env.notifications ? null : 'Allow', 'notifications']);
-      if (env.push) {
+      if (env.alwaysOn || state.settings.mode === 'always') {
+        rows.push(['Delivery mode', 'Always connected — permanent notification, nothing can cut the line', null, null]);
+        rows.push(['Battery restrictions', env.batteryUnrestricted ? 'Unrestricted (recommended)'
+          : 'Restricted — Android may close the connection', env.batteryUnrestricted ? null : 'Fix', 'battery']);
+      } else if (env.push) {
         rows.push(['Delivery mode', 'Instant wake-up (push) — no permanent notification', null, null]);
       } else if (env.pushServer) {
         rows.push(['Delivery mode', 'Wake-up server set, waiting for the push token', null, null]);
@@ -649,6 +658,10 @@
         'Sleeping — it connects when a call arrives (open this screen for a few seconds and test again)'));
     }
 
+    rows.push(state.settings.mode === 'always'
+      ? testRow('ok', 'Connection mode', 'Always connected — survives closing the app')
+      : testRow('ok', 'Connection mode', 'Battery saver — the phone is woken by a push when someone calls'));
+
     // 2. the wake-up server
     var server = (state.settings.server || '').replace(/\/+$/, '');
     if (!server) {
@@ -698,6 +711,10 @@
       todo.push('Upload server/website/index.html to the call page.');
     }
 
+    if (state.settings.mode !== 'always') {
+      todo.push('If calls still do not arrive after closing the app, set Settings → Connection mode '
+        + 'to "Always connected".');
+    }
     var bad = rows.filter(function (r) { return r.level === 'bad'; }).length;
     var hint = bad === 0
       ? 'Everything checks out. Lock the phone and call from another device to confirm.'
@@ -740,6 +757,7 @@
     applyTheme(state.settings.theme || 'system');
     $('linkBase').value = state.settings.link || DEFAULT_LINK;
     $('serverBase').value = state.settings.server || '';
+    $('modeSelect').value = state.settings.mode === 'always' ? 'always' : 'auto';
     renderVehicles();
     renderLogs();
     renderEnvironment();

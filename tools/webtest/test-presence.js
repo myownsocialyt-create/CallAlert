@@ -132,6 +132,41 @@ function build() {
   await sleep(1500);
   check('a network error triggers a reconnect', peers.length > before);
 
+  /* ---------------------------------------------------------- caller re-dials while ringing */
+  // Older call pages hang up every few seconds and dial again. The ringing screen must survive
+  // that, and Accept pressed in between must answer the next attempt instead of dying.
+  const mockCall = () => {
+    const h = {};
+    return {
+      answered: false,
+      on: (e, cb) => { h[e] = cb; },
+      answer() { this.answered = true; },
+      close() {},
+      fire: (e, arg) => { if (h[e]) h[e](arg); }
+    };
+  };
+
+  const endedBefore = calls.filter(c => c[0] === 'ended').length;
+  const attempt1 = mockCall();
+  host.emit('call', attempt1);
+  check('a new call rings again', calls.filter(c => c[0] === 'incoming').length === 2);
+
+  attempt1.fire('close');                       // the caller's page hung up mid-ring
+  await sleep(20);
+  check('a hang-up before the answer does not end the call',
+    calls.filter(c => c[0] === 'ended').length === endedBefore);
+
+  window.Presence.accept();                     // owner presses Accept in that gap
+  await sleep(30);
+  const attempt2 = mockCall();
+  host.emit('call', attempt2);                  // the page dials again
+  await sleep(60);
+  check('the re-dial is answered straight away', attempt2.answered === true);
+
+  attempt2.fire('stream', { id: 'remote2' });
+  check('the reconnected call is reported as connected',
+    calls.filter(c => c[0] === 'connected').length === 2);
+
   console.log(fails ? 'FAILURES: ' + fails : 'all good');
   process.exit(fails ? 1 : 0);
 })();

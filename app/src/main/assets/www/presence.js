@@ -25,6 +25,13 @@
   var muted = false;
 
   var RETRY_MS = [700, 1200, 2000, 3500, 5000, 8000, 12000];
+  /*
+   * Older call pages hang up every few seconds and dial again while the owner is still
+   * reaching for the phone. Instead of ending the call we hold the ringing state for this
+   * long and silently attach the next attempt from the same caller - so pressing Accept
+   * works even when the caller's page keeps re-dialling.
+   */
+  var REDIAL_GRACE_MS = 15000;
   /** After this many attempts we stop insisting on the plate id and take a random one. */
   var PLATE_ATTEMPTS = 3;
 
@@ -203,6 +210,47 @@
 
   /* ---------------------------------------------------------------- call plumbing */
 
+  function clearGrace(state) {
+    if (state && state.graceTimer) {
+      clearTimeout(state.graceTimer);
+      state.graceTimer = 0;
+    }
+  }
+
+  /** Watches a ringing call: a hang-up before the owner answers starts the grace period. */
+  function bindPending(call, plate) {
+    call.on('close', function () {
+      if (!current || current.call !== call || !current.pending || current.stale) {
+        return;
+      }
+      current.stale = true;
+      current.graceTimer = setTimeout(function () {
+        if (current && current.stale && current.pending) {
+          finish('Missed', 'incoming', plate);
+        }
+      }, REDIAL_GRACE_MS);
+    });
+  }
+
+  /** Answers the ringing call with the microphone. Waits for a re-dial when needed. */
+  function answerCurrent() {
+    var incoming = current;
+    if (!incoming || !incoming.pending || incoming.stale) {
+      return;
+    }
+    acquireStream().then(function (stream) {
+      if (current !== incoming || !incoming.pending || incoming.stale) {
+        return; // the caller re-dialled: the new attempt is answered when it arrives
+      }
+      incoming.pending = false;
+      clearGrace(incoming);
+      wire(incoming.call, incoming.number, 'incoming');
+      incoming.call.answer(stream, CALL_OPTIONS);
+    }).catch(function () {
+      finish('Microphone unavailable', 'incoming', incoming.number);
+    });
+  }
+
   function finish(status, direction, number) {
     var seconds = 0;
     if (current && current.connectedAt) {
@@ -218,6 +266,7 @@
       });
     }
     if (current) {
+      clearGrace(current);
       try { current.call.close(); } catch (e) { /* ignore */ }
       current = null;
     }
@@ -367,6 +416,18 @@
         try { call.close(); } catch (e) { /* ignore */ }
         return;
       }
+      if (current && current.stale && current.number === entry.plate && current.pending) {
+        // The same caller dialled again during the grace period: keep the ringing screen.
+        clearGrace(current);
+        current.call = call;
+        current.stale = false;
+        bindPending(call, entry.plate);
+        signal(entry, { t: 'ringing', plate: entry.plate });
+        if (current.acceptWanted) {
+          answerCurrent();
+        }
+        return;
+      }
       if (current) {
         signal(entry, { t: 'busy', plate: entry.plate });
         try { call.close(); } catch (e) { /* ignore */ }
@@ -377,16 +438,14 @@
         number: entry.plate,
         direction: 'incoming',
         connectedAt: 0,
-        pending: true
+        pending: true,
+        stale: false,
+        acceptWanted: false,
+        graceTimer: 0
       };
       signal(entry, { t: 'ringing', plate: entry.plate });
       report('incoming', [entry.plate]);
-
-      call.on('close', function () {
-        if (current && current.call === call && current.pending) {
-          finish('Missed', 'incoming', entry.plate);
-        }
-      });
+      bindPending(call, entry.plate);
     });
 
     peer.on('connection', function (conn) {
@@ -576,18 +635,15 @@
       if (!current || !current.pending) {
         return;
       }
-      var incoming = current;
-      signalCurrent({ t: 'answering', plate: incoming.number });
-      acquireStream().then(function (stream) {
-        if (!current || current !== incoming) {
-          return;
-        }
-        incoming.pending = false;
-        wire(incoming.call, incoming.number, 'incoming');
-        incoming.call.answer(stream, CALL_OPTIONS);
-      }).catch(function () {
-        finish('Microphone unavailable', 'incoming', incoming.number);
-      });
+      current.acceptWanted = true;
+      signalCurrent({ t: 'answering', plate: current.number });
+      if (current.stale) {
+        // The caller's page hung up a moment ago and is about to dial again: warm up the
+        // microphone now so the next attempt is answered instantly.
+        acquireStream().catch(function () { /* reported when the call arrives */ });
+        return;
+      }
+      answerCurrent();
     },
 
     decline: function () {

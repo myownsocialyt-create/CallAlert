@@ -67,6 +67,11 @@ public class WebAppBridge {
             return;
         }
         Prefs.setSettings(activity, json);
+        // A changed connection mode or server address must take effect straight away.
+        if (!Prefs.getOnline(activity).isEmpty()) {
+            CallService.sync(activity);
+            CallService.foreground(activity, true);
+        }
     }
 
     @JavascriptInterface

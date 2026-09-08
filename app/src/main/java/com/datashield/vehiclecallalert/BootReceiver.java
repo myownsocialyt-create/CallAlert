@@ -23,12 +23,14 @@ public class BootReceiver extends BroadcastReceiver {
                 if (Prefs.getOnline(context).isEmpty()) {
                     break;
                 }
-                if (PushRegistrar.isConfigured(context)) {
+                if (PushRegistrar.isConfigured(context) && !Prefs.isAlwaysOn(context)) {
                     // Push mode needs no connection at all - just make sure the wake-up
                     // server still has a valid token for this device.
                     PushRegistrar.refreshToken(context);
                     PushRegistrar.registerAll(context);
                 } else {
+                    // Always-connected mode: bring the sockets straight back up.
+                    PushRegistrar.refreshToken(context);
                     CallService.sync(context);
                 }
                 break;

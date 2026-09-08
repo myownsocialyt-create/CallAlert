@@ -228,7 +228,7 @@ public class CallService extends Service {
             case ACTION_GO_ONLINE:
                 if (!TextUtils.isEmpty(number)) {
                     Prefs.setOnline(this, number, true);
-                    if (PushRegistrar.isConfigured(this)) {
+                    if (pushMode()) {
                         // Push mode: the wake-up server keeps the vehicle reachable while the
                         // app sleeps. With the app open we stay connected as well, so a call
                         // placed right now rings without waiting for the push round trip.
@@ -277,7 +277,7 @@ public class CallService extends Service {
                     for (String plate : Prefs.getOnline(this)) {
                         sendJs("Presence.goOnline('" + plate + "')");
                     }
-                } else if (PushRegistrar.isConfigured(this)
+                } else if (pushMode()
                         && CallBus.STATE_IDLE.equals(callState)
                         && SystemClock.elapsedRealtime() >= wakeUntilElapsed) {
                     // Push takes over again - drop the sockets so the phone can sleep.
@@ -408,9 +408,16 @@ public class CallService extends Service {
         pendingJs.clear();
     }
 
+    /** True when the phone may sleep because the wake-up server can ring it. */
+    private boolean pushMode() {
+        return PushRegistrar.isConfigured(this) && !Prefs.isAlwaysOn(this);
+    }
+
     private void syncOnlineVehicles() {
-        if (PushRegistrar.isConfigured(this)) {
-            PushRegistrar.registerAll(this);
+        // The push registration is kept up to date in both modes: it costs nothing and is the
+        // safety net that delivers a missed-call notice when the connection is gone.
+        PushRegistrar.registerAll(this);
+        if (pushMode()) {
             return;
         }
         for (String number : Prefs.getOnline(this)) {
@@ -1052,7 +1059,7 @@ public class CallService extends Service {
             return;
         }
         // Without push the service is the only thing keeping the vehicle reachable.
-        if (!PushRegistrar.isConfigured(this) && !Prefs.getOnline(this).isEmpty()) {
+        if (!pushMode() && !Prefs.getOnline(this).isEmpty()) {
             return;
         }
         // With the app open we keep the peers connected so calls arrive instantly.

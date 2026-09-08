@@ -162,6 +162,16 @@ PeerJS ID the app registers is the **plain vehicle number** (A–Z and 0–9, up
 landing page calls, so scanning the code reaches the phone directly. The app answers with a live
 microphone stream, which is what makes the caller's page switch from *Ringing* to *Connected*.
 
+## If calls do not arrive
+
+Open the app → **My Garage** → **Run connection test**. It checks the phone, the wake-up server
+and the call page and names whatever is out of date.
+
+Phones with an aggressive battery manager (Xiaomi, Oppo, Vivo, realme, Samsung power saving)
+sometimes stop delivering pushes after the app is swiped out of recents. For those, switch
+**Settings → Connection mode** to **Always connected**: the app then keeps its own connection
+open in a foreground service and no push is needed.
+
 ## Google Play declarations you must fill in
 
 The code is policy-compliant, but the Play Console asks you to *declare* three things:

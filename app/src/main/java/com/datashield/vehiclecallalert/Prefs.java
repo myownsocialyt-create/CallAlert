@@ -143,6 +143,15 @@ public final class Prefs {
         return url.startsWith("https://") ? url : "";
     }
 
+    /**
+     * "always" keeps the connection open in a foreground service, which is the only thing that
+     * survives phones whose battery manager kills push delivery when the app is swiped away.
+     * Anything else means: sleep and let the wake-up server ring us.
+     */
+    public static boolean isAlwaysOn(Context context) {
+        return "always".equals(getSettings(context).optString("mode", "auto"));
+    }
+
     /* ----------------------------------------------------------------- push */
 
     public static String getPushToken(Context context) {

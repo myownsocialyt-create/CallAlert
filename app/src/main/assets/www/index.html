@@ -161,6 +161,15 @@
       <p class="small muted">The QR code opens this page with <code>?car_id=</code> and your vehicle number.
         Leave the default if you are unsure.</p>
 
+      <label class="label" for="modeSelect">Connection mode</label>
+      <select id="modeSelect" class="input">
+        <option value="auto">Battery saver — wake up when someone calls</option>
+        <option value="always">Always connected — never miss a call</option>
+      </select>
+      <p class="small muted">Choose <b>Always connected</b> if calls do not arrive after closing the app.
+        It keeps a permanent notification, which is what stops some phones from cutting the
+        connection when the app is swiped away.</p>
+
       <label class="label" for="serverBase">Instant wake-up server (optional)</label>
       <input id="serverBase" class="input" placeholder="https://…workers.dev" autocomplete="off" spellcheck="false">
       <p class="small muted">With a wake-up server the app is woken by a push only when someone calls,
