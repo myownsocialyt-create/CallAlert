@@ -153,7 +153,6 @@ public class CallService extends Service {
         send(context, new Intent(context, CallService.class).setAction(ACTION_GO_OFFLINE_ALL));
     }
 
-    /** Comes online for a few seconds so the caller's PeerJS call can arrive. */
     /** Called by the UI: while the app is open every online vehicle stays connected. */
     public static void foreground(Context context, boolean visible) {
         if (Prefs.getOnline(context).isEmpty()) {
@@ -163,6 +162,7 @@ public class CallService extends Service {
                 .setAction(ACTION_FOREGROUND).putExtra(EXTRA_FLAG, visible));
     }
 
+    /** Comes online for a few seconds so the caller's PeerJS call can arrive. */
     public static void wake(Context context, String number) {
         send(context, new Intent(context, CallService.class)
                 .setAction(ACTION_WAKE).putExtra(EXTRA_NUMBER, number));
