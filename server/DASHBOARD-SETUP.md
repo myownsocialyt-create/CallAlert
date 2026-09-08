@@ -41,15 +41,18 @@ credit card. Firebase stays on the free Spark plan.
    ```
 
    Click inside it, press **Ctrl+A** (Cmd+A on Mac) and **Delete** so the file is empty.
-6. Paste the **entire content** of [`server/worker/src/index.js`](worker/src/index.js) from this
-   repository (GitHub → open the file → *Copy raw file* button).
+6. Paste the **entire content** of [`server/worker/worker.paste.js`](worker/worker.paste.js) from
+   this repository (GitHub → open the file → *Copy raw file* button). It is the same program as
+   `src/index.js`, but written with `//` comments only, so a half-deleted sample cannot break it.
 
    * Keep the existing file name (`worker.js` is fine) — the name does not matter.
    * Do **not** create a second file: two `export default` blocks in one worker is an error.
    * Do **not** paste `wrangler.toml` anywhere; in the dashboard those settings are the KV
      binding (step 3) and the secret (step 4).
-   * After pasting, the first line should read `/**` followed by
-     `* Vehicle Call Alert — wake-up server.`
+   * After pasting, the **first** line must be `// ====...` and the **last** line must be
+     `// END OF FILE`. If you see anything after `// END OF FILE`, delete it — that leftover is
+     what causes `Uncaught SyntaxError: Unexpected token '*'`.
+   * The editor should show **290 lines** in total.
 7. Click **Deploy** (top right). Visiting the URL now may show an error until steps 3 and 4 are
    done — that is expected; `/health` already works.
 8. Whenever you add the binding or the secret afterwards, press **Deploy** again so the running
