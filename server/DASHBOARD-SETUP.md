@@ -144,6 +144,17 @@ npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 npx wrangler deploy
 ```
 
+### No website needed any more
+
+The worker serves the call page itself at
+
+```
+https://<your-worker>.workers.dev/call?car_id=PLATE
+```
+
+The app now generates its QR codes with that address, so a separate GitHub Pages site is
+optional. The old page keeps working for QR codes that are already printed.
+
 ### Updating the worker later
 
 The worker code changes when the app changes. To update: **Workers & Pages -> vehicle-alert ->

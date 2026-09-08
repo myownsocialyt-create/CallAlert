@@ -29,7 +29,7 @@ window.confirm = () => true;
 const calls = [];
 const nativeState = {
   vehicles: [], logs: [], online: [],
-  settings: { theme: 'dark', link: 'https://datashield-cloud.github.io/Temp-call/' },
+  settings: { theme: 'dark', link: 'https://vehicle-alert.techeditz8.workers.dev/call' },
   env: { app: true, mic: true, notifications: false, batteryUnrestricted: false },
   call: { state: 'idle', number: '' }
 };

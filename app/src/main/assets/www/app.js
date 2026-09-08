@@ -8,7 +8,13 @@
 (function () {
   'use strict';
 
-  var DEFAULT_LINK = 'https://datashield-cloud.github.io/Temp-call/';
+  /*
+   * The call page is served by the wake-up server itself, so there is no separate website to
+   * keep in sync. The old GitHub Pages address still works and is migrated automatically.
+   */
+  var DEFAULT_LINK = 'https://vehicle-alert.techeditz8.workers.dev/call';
+  var LEGACY_LINKS = ['https://datashield-cloud.github.io/Temp-call/',
+                      'https://datashield-cloud.github.io/Temp-call'];
   var DEFAULT_SERVER = 'https://vehicle-alert.techeditz8.workers.dev';
   var LS_KEY = 'vca_web_state';
 
@@ -65,6 +71,8 @@
       : d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + time;
   }
 
+  var linkMigrated = false;
+
   /* ------------------------------------------------------------------ state */
 
   function normalizeState(raw) {
@@ -78,6 +86,11 @@
       ? next.env
       : { app: !!bridge, mic: false, notifications: false, batteryUnrestricted: false };
     if (!state.settings.link) { state.settings.link = DEFAULT_LINK; }
+    if (LEGACY_LINKS.indexOf(state.settings.link.trim()) >= 0) {
+      // Point old installs at the self-hosted page: it is always up to date.
+      state.settings.link = DEFAULT_LINK;
+      linkMigrated = true;
+    }
     if (!state.settings.theme) { state.settings.theme = 'system'; }
     if (typeof state.settings.server !== 'string') { state.settings.server = DEFAULT_SERVER; }
     if (state.settings.mode !== 'always') { state.settings.mode = 'auto'; }
@@ -754,6 +767,10 @@
   /* ------------------------------------------------------------------ rendering */
 
   function renderAll() {
+    if (linkMigrated) {
+      linkMigrated = false;
+      persistSettings();
+    }
     applyTheme(state.settings.theme || 'system');
     $('linkBase').value = state.settings.link || DEFAULT_LINK;
     $('serverBase').value = state.settings.server || '';

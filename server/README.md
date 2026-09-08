@@ -66,7 +66,13 @@ In the app: **Settings → Instant wake-up server** → paste the Worker URL →
 The app registers every online vehicle with the server and then stops its background
 connection — from that moment there is no permanent notification.
 
-## 4. Patch the call page
+## 4. The call page (already included)
+
+The worker serves the ready-made page at `<worker>/call?car_id=PLATE`, and the app points its
+QR codes there, so there is nothing else to host. Keep reading only if you want the page on
+your own domain.
+
+## 4b. Patch your own call page
 
 **The patched page is already in this repo: [`server/website/index.html`](website/index.html).**
 Open it, put your Worker URL in the one config line at the top of the script…
