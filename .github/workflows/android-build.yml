@@ -54,6 +54,28 @@ jobs:
             echo "No KEYSTORE_BASE64 secret set - the release build will be unsigned."
           fi
 
+      - name: Check Firebase push configuration
+        run: |
+          if [ -f app/google-services.json ]; then
+            python3 - <<'PY'
+          import json, re, sys, pathlib
+          cfg = json.loads(pathlib.Path("app/google-services.json").read_text())
+          gradle = pathlib.Path("app/build.gradle").read_text()
+          app_id = re.search(r'applicationId\s+"([^"]+)"', gradle).group(1)
+          packages = [c["client_info"]["android_client_info"]["package_name"] for c in cfg["client"]]
+          project = cfg["project_info"]["project_id"]
+          print(f"Firebase project : {project}")
+          print(f"applicationId    : {app_id}")
+          print(f"config packages  : {packages}")
+          if app_id not in packages:
+              print(f"::error title=Firebase config mismatch::google-services.json has no client for {app_id}; add an Android app with that exact package name in the Firebase console.")
+              sys.exit(1)
+          print("::notice title=Push enabled::Instant wake-up (FCM) is compiled into this build.")
+          PY
+          else
+            echo "::notice title=Push disabled::app/google-services.json not present - building with the always-connected foreground service."
+          fi
+
       - name: Build debug APK
         run: |
           set -o pipefail
