@@ -72,8 +72,10 @@ jobs:
               sys.exit(1)
           print("::notice title=Push enabled::Instant wake-up (FCM) is compiled into this build.")
           PY
+          elif [ -f app/src/main/res/main/values/firebase_options.xml ] || [ -f app/src/main/res/values/firebase_options.xml ]; then
+            echo "::notice title=Push enabled::Firebase configured through res/values/firebase_options.xml."
           else
-            echo "::notice title=Push disabled::app/google-services.json not present - building with the always-connected foreground service."
+            echo "::notice title=Push disabled::No Firebase configuration - building with the always-connected foreground service."
           fi
 
       - name: Build debug APK
