@@ -52,7 +52,7 @@ credit card. Firebase stays on the free Spark plan.
    * After pasting, the **first** line must be `// ====...` and the **last** line must be
      `// END OF FILE`. If you see anything after `// END OF FILE`, delete it — that leftover is
      what causes `Uncaught SyntaxError: Unexpected token '*'`.
-   * The editor should show **290 lines** in total.
+   * The editor should show **330 lines** in total.
 7. Click **Deploy** (top right). Visiting the URL now may show an error until steps 3 and 4 are
    done — that is expected; `/health` already works.
 8. Whenever you add the binding or the secret afterwards, press **Deploy** again so the running
@@ -87,6 +87,24 @@ The worker remembers "plate → phone" in a Cloudflare KV store.
 3. **Save / Deploy**.
 
 ## Step 5 — Check it works (30 seconds)
+
+Open the **self-check** page in your browser (your address + `/diag`):
+
+```
+https://vehicle-call-alert-wake.yourname.workers.dev/diag
+```
+
+```json
+{"ok":true,"kv":true,"secret":true,"project_id":"call-alert-5fadd","google_auth":"ok",
+ "next_step":"Everything is ready - send this worker URL back to the developer."}
+```
+
+Any `false` in there tells you which step to redo — `next_step` says it in words.
+
+Note: opening the bare address (without a path) shows `{"ok":false,"error":"not_found"}`.
+That is normal — the worker only answers on `/health`, `/diag`, `/status`, `/register`,
+`/unregister`, `/ring` and `/cancel`.
+
 
 Open this in your browser (your own address + `/health`):
 

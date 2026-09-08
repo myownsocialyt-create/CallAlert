@@ -11,6 +11,7 @@
  *   POST /cancel      { plate }                   -> caller gave up (missed-call push)
  *   GET  /status?plate=XX                         -> { reachable: true|false }
  *   GET  /health
+ *   GET  /diag                                    -> self-check: KV bound? secret valid?
  *
  * Storage: one Workers KV namespace (free tier). Nothing personal is stored — only the
  * uppercase plate, the FCM token and a timestamp.
@@ -32,6 +33,8 @@ export default {
       switch (`${request.method} ${url.pathname}`) {
         case 'GET /health':
           return cors(json({ ok: true, service: 'vehicle-call-alert-wake' }), request, env);
+        case 'GET /diag':
+          return cors(await diag(env), request, env);
         case 'GET /status':
           return cors(await status(url, env), request, env);
         case 'POST /register':
@@ -81,6 +84,44 @@ async function unregister(request, env) {
   }
   await env.TOKENS.delete(`plate:${plate}`);
   return json({ ok: true, plate });
+}
+
+/** Self-check used during setup: reports which pieces are configured, without leaking them. */
+async function diag(env) {
+  const result = { ok: false, kv: false, secret: false, project_id: null, google_auth: null };
+
+  try {
+    await env.TOKENS.get('diag:probe');
+    result.kv = true;
+  } catch (err) {
+    result.kv_error = 'KV namespace binding "TOKENS" is missing (Settings -> Bindings)';
+  }
+
+  let account = null;
+  try {
+    account = serviceAccount(env);
+    result.secret = true;
+    result.project_id = account.project_id || null;
+  } catch (err) {
+    result.secret_error = 'Secret "FIREBASE_SERVICE_ACCOUNT" is missing or is not valid JSON';
+  }
+
+  if (account && result.kv) {
+    try {
+      await accessTokenFor(env, account);
+      result.google_auth = 'ok';
+    } catch (err) {
+      result.google_auth = String(err && err.message).slice(0, 200);
+    }
+  }
+
+  result.ok = result.kv && result.secret && result.google_auth === 'ok';
+  result.next_step = result.ok
+    ? 'Everything is ready - send this worker URL back to the developer.'
+    : (!result.kv ? 'Add the KV binding named TOKENS, then Deploy again.'
+      : !result.secret ? 'Add the secret FIREBASE_SERVICE_ACCOUNT, then Deploy again.'
+        : 'Check that the pasted service-account JSON is the complete file.');
+  return json(result);
 }
 
 async function status(url, env) {
