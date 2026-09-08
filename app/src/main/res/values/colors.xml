@@ -5,7 +5,6 @@
     <color name="ic_launcher_background">#FF111114</color>
 
     <!-- Full screen call UI -->
-    <color name="call_background">#FF08080A</color>
     <color name="call_text">#FFFAFAFA</color>
     <color name="call_muted">#FF9F9FA9</color>
     <color name="call_green">#FF22C55E</color>
