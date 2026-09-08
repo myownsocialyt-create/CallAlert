@@ -650,26 +650,39 @@
     }
 
     var online = state.online || [];
-    var plate = online[0] || '';
-    if (!plate) {
+    var garage = (state.vehicles || []).map(function (v) { return v.number; });
+    if (!online.length) {
       rows.push(testRow('bad', 'Vehicle switched on', 'No vehicle is Active — tap Active on a vehicle first'));
       renderTest(rows, 'Switch a vehicle to Active, then run the test again.');
       return;
     }
-    rows.push(testRow('ok', 'Vehicle switched on', plate + ' is set to Active'));
 
-    // 1. this phone's own signalling connection
-    var link = (state.link || {})[plate] || {};
-    if (link.peer) {
-      rows.push(testRow('ok', 'Call connection on this phone',
-        'Listening as ' + link.peer));
-    } else if (link.err) {
-      rows.push(testRow('warn', 'Call connection on this phone',
-        (LINK_ERRORS[link.err] || link.err) + ' — reconnecting automatically'));
-    } else {
-      rows.push(testRow('warn', 'Call connection on this phone',
-        'Sleeping — it connects when a call arrives (open this screen for a few seconds and test again)'));
-    }
+    // Every number this phone answers. A number that is not in the garage is why a call for
+    // one plate can ring showing another one.
+    rows.push(testRow('ok', 'Numbers this phone answers', online.join(', ')));
+    online.forEach(function (number) {
+      var info = (state.link || {})[number] || {};
+      var where;
+      var level = 'ok';
+      if (info.peer) {
+        where = 'Listening' + (info.peer === number ? '' : ' as ' + info.peer);
+      } else if (info.err) {
+        where = LINK_ERRORS[info.err] || info.err;
+        level = 'warn';
+      } else {
+        where = 'Sleeping — connects when a call arrives';
+        level = 'warn';
+      }
+      if (garage.indexOf(number) < 0) {
+        level = 'bad';
+        where = 'NOT in your garage — this old number still rings this phone';
+        todo.push('The app is still answering ' + number + '. Open the app once: it is switched '
+          + 'off automatically. Any QR code printed with ' + number + ' will stop working.');
+      }
+      rows.push(testRow(level, 'Number ' + number, where));
+    });
+
+    var plate = online[0];
 
     rows.push(state.settings.mode === 'always'
       ? testRow('ok', 'Connection mode', 'Always connected — survives closing the app')

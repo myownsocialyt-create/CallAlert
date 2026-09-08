@@ -43,6 +43,9 @@ import androidx.core.app.Person;
 import androidx.core.content.ContextCompat;
 import androidx.webkit.WebViewAssetLoader;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -274,6 +277,7 @@ public class CallService extends Service {
             case ACTION_FOREGROUND:
                 appForeground = flag;
                 if (flag) {
+                    reconcileOnline();
                     for (String plate : Prefs.getOnline(this)) {
                         sendJs("Presence.goOnline('" + plate + "')");
                     }
@@ -413,7 +417,42 @@ public class CallService extends Service {
         return PushRegistrar.isConfigured(this) && !Prefs.isAlwaysOn(this);
     }
 
+    /**
+     * Drops "online" numbers that are no longer in the garage.
+     *
+     * <p>Without this a vehicle that was removed - or that survived from an older install -
+     * keeps answering calls, so a QR code for a deleted number still rings this phone and the
+     * incoming screen shows a plate the user no longer recognises.</p>
+     */
+    private void reconcileOnline() {
+        List<String> known = new ArrayList<>();
+        JSONArray vehicles = Prefs.getVehicles(this);
+        for (int i = 0; i < vehicles.length(); i++) {
+            JSONObject vehicle = vehicles.optJSONObject(i);
+            if (vehicle == null) {
+                continue;
+            }
+            String plate = sanitize(vehicle.optString("number", ""));
+            if (!plate.isEmpty()) {
+                known.add(plate);
+            }
+        }
+        if (known.isEmpty() && vehicles.length() > 0) {
+            return; // unreadable list - never switch everything off by accident
+        }
+        for (String plate : Prefs.getOnline(this)) {
+            if (known.contains(plate)) {
+                continue;
+            }
+            Prefs.setOnline(this, plate, false);
+            Prefs.setPeerId(this, plate, "");
+            PushRegistrar.unregister(this, plate);
+            sendJs("Presence.goOffline('" + plate + "')");
+        }
+    }
+
     private void syncOnlineVehicles() {
+        reconcileOnline();
         // The push registration is kept up to date in both modes: it costs nothing and is the
         // safety net that delivers a missed-call notice when the connection is gone.
         PushRegistrar.registerAll(this);

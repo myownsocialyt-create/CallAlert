@@ -17,7 +17,7 @@ let fails = 0;
 const check = (name, cond) => { console.log((cond ? 'PASS  ' : 'FAIL  ') + name); if (!cond) fails++; };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function boot({ status, pageHtml }) {
+function boot({ status, pageHtml, extraOnline }) {
   const dom = new JSDOM(fs.readFileSync(path.join(WWW, 'index.html'), 'utf8'), {
     runScripts: 'outside-only',
     pretendToBeVisual: true,
@@ -32,7 +32,7 @@ function boot({ status, pageHtml }) {
   const nativeState = {
     vehicles: [{ number: 'UP16AB1234', type: 'Car', nick: 'My car' }],
     logs: [],
-    online: ['UP16AB1234'],
+    online: ['UP16AB1234'].concat(extraOnline || []),
     link: { UP16AB1234: { peer: 'UP16AB1234' } },
     registered: ['UP16AB1234'],
     pushToken: true,
@@ -92,8 +92,22 @@ function boot({ status, pageHtml }) {
 
   text = $('testList').textContent;
   check('reports the published id', /vca-42/.test(text));
+  check('lists the numbers the phone answers', /Numbers this phone answers/.test(text));
   check('reports the call page as up to date', /Up to date/.test(text));
   check('closes with an all-clear', /Everything checks out/.test($('testHint').textContent));
+
+  /* ------------------------------------------------ a number that is no longer in the garage */
+  window = boot({
+    status: { ok: true, plate: 'UP16AB1234', reachable: true, awake: true, peerId: 'vca-42' },
+    pageHtml: '<html><script>const RING_WINDOW_MS = 60000;</script></html>',
+    extraOnline: ['UK11']
+  });
+  $ = id => window.document.getElementById(id);
+  $('selfTestBtn').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  await sleep(400);
+  text = $('testList').textContent;
+  check('a stray old number is flagged', /UK11/.test(text) && /NOT in your garage/.test(text));
+  check('and it explains what happens next', /switched off automatically/.test($('testHint').textContent));
 
   console.log(fails ? 'FAILURES: ' + fails : 'all good');
   process.exit(fails ? 1 : 0);
