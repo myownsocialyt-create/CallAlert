@@ -256,76 +256,110 @@
 
   /* ---------------------------------------------------------------- host peers */
 
+  /*
+   * Every online vehicle listens on TWO sockets at once:
+   *
+   *   "plate"  - the vehicle number itself, which older call pages dial directly. The PeerJS
+   *              broker sometimes still holds that name from the previous session, so this one
+   *              retries for as long as the vehicle is switched on.
+   *   "backup" - a random id that is always available. It is published on the wake-up server,
+   *              so a modern call page can reach the phone even while the plate is still taken.
+   *
+   * Both answer incoming calls, so a call gets through whichever id the caller used.
+   */
+
   function entryFor(plate) {
     if (!hosts[plate]) {
-      hosts[plate] = {
-        plate: plate,
-        peer: null,
-        peerId: '',
-        attempt: 0,
-        wanted: true,
-        conns: [],
-        retryTimer: 0
-      };
+      hosts[plate] = { plate: plate, wanted: true, conns: [], slots: {} };
     }
     return hosts[plate];
   }
 
-  function scheduleRetry(entry) {
-    if (!entry.wanted || entry.retryTimer) {
+  function slotFor(entry, kind) {
+    if (!entry.slots[kind]) {
+      entry.slots[kind] = { kind: kind, peer: null, id: '', attempt: 0, timer: 0 };
+    }
+    return entry.slots[kind];
+  }
+
+  /** The id we want callers to use: the plate when it is ours, otherwise the random one. */
+  function bestId(entry) {
+    var plateSlot = entry.slots.plate;
+    if (plateSlot && plateSlot.peer && plateSlot.peer.open && plateSlot.id) {
+      return plateSlot.id;
+    }
+    var backup = entry.slots.backup;
+    if (backup && backup.peer && backup.peer.open && backup.id) {
+      return backup.id;
+    }
+    return '';
+  }
+
+  function announce(entry) {
+    var id = bestId(entry);
+    if (id) {
+      report('online', [entry.plate, id]);
+    } else {
+      report('offline', [entry.plate]);
+    }
+  }
+
+  function scheduleSlot(entry, slot) {
+    if (!entry.wanted || slot.timer) {
       return;
     }
-    var delay = RETRY_MS[Math.min(entry.attempt, RETRY_MS.length - 1)];
-    entry.retryTimer = setTimeout(function () {
-      entry.retryTimer = 0;
-      if (entry.wanted) {
-        spawn(entry);
+    var delay = RETRY_MS[Math.min(slot.attempt, RETRY_MS.length - 1)];
+    slot.timer = setTimeout(function () {
+      slot.timer = 0;
+      if (entry.wanted && hosts[entry.plate] === entry) {
+        spawnSlot(entry, slot);
       }
     }, delay);
   }
 
-  function dropPeer(entry) {
-    if (entry.peer) {
+  function dropSlot(slot) {
+    if (slot.timer) {
+      clearTimeout(slot.timer);
+      slot.timer = 0;
+    }
+    if (slot.peer) {
       try {
-        if (!entry.peer.destroyed) {
-          entry.peer.destroy();
+        if (!slot.peer.destroyed) {
+          slot.peer.destroy();
         }
       } catch (e) { /* ignore */ }
     }
-    entry.peer = null;
-    entry.peerId = '';
-    entry.conns = [];
+    slot.peer = null;
+    slot.id = '';
   }
 
-  function spawn(entry) {
-    if (!entry.wanted || typeof window.Peer !== 'function') {
-      if (typeof window.Peer !== 'function') {
-        report('error', [entry.plate, 'engine', 'PeerJS missing']);
-      }
+  function spawnSlot(entry, slot) {
+    if (!entry.wanted || hosts[entry.plate] !== entry) {
       return;
     }
-    dropPeer(entry);
+    if (typeof window.Peer !== 'function') {
+      report('error', [entry.plate, 'engine', 'PeerJS missing']);
+      return;
+    }
+    dropSlot(slot);
 
-    // The first attempts claim the plate itself (old call pages dial it directly). If the
-    // broker still holds a stale socket for that id we take a random one instead and publish
-    // it through the wake-up server - the call still gets through.
     var peer;
     try {
-      peer = entry.attempt < PLATE_ATTEMPTS ? new window.Peer(entry.plate) : new window.Peer();
+      peer = slot.kind === 'plate' ? new window.Peer(entry.plate) : new window.Peer();
     } catch (e) {
-      entry.attempt++;
-      scheduleRetry(entry);
+      slot.attempt++;
+      scheduleSlot(entry, slot);
       return;
     }
-    entry.peer = peer;
+    slot.peer = peer;
 
     peer.on('open', function (id) {
-      if (hosts[entry.plate] !== entry || entry.peer !== peer) {
+      if (hosts[entry.plate] !== entry || slot.peer !== peer) {
         return;
       }
-      entry.peerId = id || entry.plate;
-      entry.attempt = 0;
-      report('online', [entry.plate, entry.peerId]);
+      slot.id = id || (slot.kind === 'plate' ? entry.plate : '');
+      slot.attempt = 0;
+      announce(entry);
     });
 
     peer.on('call', function (call) {
@@ -368,53 +402,73 @@
       report('error', [entry.plate, type, err && err.message ? err.message : '']);
 
       if (type === 'peer-unavailable') {
-        return; // an outgoing dial failed, the host peer itself is fine
+        return; // an outgoing dial failed, this listening socket is fine
       }
-      if (type === 'browser-incompatible' || type === 'invalid-id' || type === 'invalid-key') {
+      if (type === 'browser-incompatible' || type === 'invalid-key') {
         entry.wanted = false;
-        dropPeer(entry);
-        report('offline', [entry.plate]);
+        dropSlot(slot);
+        announce(entry);
         return;
       }
-      // unavailable-id / network / server-error / socket-error: keep trying, the stale socket
-      // on the broker disappears within a few seconds.
-      if (hosts[entry.plate] === entry && entry.peer === peer) {
-        entry.attempt++;
-        entry.peerId = '';
-        scheduleRetry(entry);
+      if (hosts[entry.plate] !== entry || slot.peer !== peer) {
+        return;
       }
+      // unavailable-id / network / server-error / socket-error: the plate frees up within
+      // seconds, so keep trying. The backup socket keeps the vehicle callable meanwhile.
+      slot.attempt++;
+      slot.id = '';
+      announce(entry);
+      scheduleSlot(entry, slot);
     });
 
     peer.on('disconnected', function () {
-      if (hosts[entry.plate] !== entry || !entry.wanted) {
+      if (hosts[entry.plate] !== entry || !entry.wanted || slot.peer !== peer) {
         return;
       }
-      entry.peerId = '';
+      slot.id = '';
       setTimeout(function () {
-        if (hosts[entry.plate] !== entry || !entry.wanted || entry.peer !== peer) {
+        if (hosts[entry.plate] !== entry || !entry.wanted || slot.peer !== peer) {
           return;
         }
         try {
           if (!peer.destroyed) {
             peer.reconnect();
           } else {
-            scheduleRetry(entry);
+            scheduleSlot(entry, slot);
           }
         } catch (e) {
-          scheduleRetry(entry);
+          scheduleSlot(entry, slot);
         }
       }, 1200);
     });
 
     peer.on('close', function () {
-      if (hosts[entry.plate] !== entry || entry.peer !== peer) {
+      if (hosts[entry.plate] !== entry || slot.peer !== peer) {
         return;
       }
-      entry.peerId = '';
-      report('offline', [entry.plate]);
+      slot.id = '';
+      announce(entry);
       if (entry.wanted) {
-        scheduleRetry(entry);
+        scheduleSlot(entry, slot);
       }
+    });
+  }
+
+  function startHost(plate) {
+    var entry = entryFor(plate);
+    entry.wanted = true;
+    ['plate', 'backup'].forEach(function (kind) {
+      var slot = slotFor(entry, kind);
+      if (slot.peer && !slot.peer.destroyed) {
+        if (slot.peer.open) {
+          announce(entry);
+        } else if (slot.peer.disconnected) {
+          try { slot.peer.reconnect(); } catch (e) { spawnSlot(entry, slot); }
+        }
+        return;
+      }
+      slot.attempt = 0;
+      spawnSlot(entry, slot);
     });
   }
 
@@ -424,12 +478,9 @@
       return;
     }
     entry.wanted = false;
-    if (entry.retryTimer) {
-      clearTimeout(entry.retryTimer);
-      entry.retryTimer = 0;
-    }
     delete hosts[plate];
-    dropPeer(entry);
+    Object.keys(entry.slots).forEach(function (kind) { dropSlot(entry.slots[kind]); });
+    entry.conns = [];
     report('offline', [plate]);
   }
 
@@ -479,20 +530,7 @@
       if (!number) {
         return;
       }
-      var entry = entryFor(number);
-      entry.wanted = true;
-      if (entry.peer && !entry.peer.destroyed) {
-        if (entry.peer.open) {
-          report('online', [number, entry.peerId || number]);
-          return;
-        }
-        if (entry.peer.disconnected) {
-          try { entry.peer.reconnect(); return; } catch (e) { /* fall through */ }
-        }
-        return; // still connecting
-      }
-      entry.attempt = 0;
-      spawn(entry);
+      startHost(number);
     },
 
     goOffline: function (number) {
@@ -581,14 +619,8 @@
     networkUp: function () {
       Object.keys(hosts).forEach(function (plate) {
         var entry = hosts[plate];
-        if (!entry || !entry.wanted) {
-          return;
-        }
-        if (!entry.peer || entry.peer.destroyed) {
-          entry.attempt = 0;
-          spawn(entry);
-        } else if (entry.peer.disconnected) {
-          try { entry.peer.reconnect(); } catch (e) { spawn(entry); }
+        if (entry && entry.wanted) {
+          startHost(plate);
         }
       });
     },
@@ -596,7 +628,7 @@
     /** Comma separated "PLATE=peerid" list - used by the in-app diagnostics screen. */
     status: function () {
       return Object.keys(hosts).map(function (plate) {
-        return plate + '=' + (hosts[plate].peerId || 'connecting');
+        return plate + '=' + (bestId(hosts[plate]) || 'connecting');
       }).join(',');
     }
   };

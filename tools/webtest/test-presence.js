@@ -70,25 +70,25 @@ function build() {
   check('engine reported ready', calls.some(c => c[0] === 'ready'));
 
   window.Presence.goOnline('UP16AB1234');
-  check('first attempt claims the plate itself', peers[0].requestedId === 'UP16AB1234');
+  check('claims the plate itself for old call pages', peers[0].requestedId === 'UP16AB1234');
+  check('opens a always-available backup id as well',
+    peers.length === 2 && peers[1].requestedId === null);
 
-  // The broker still holds the socket from the previous session.
+  // The broker still holds the plate from the previous session.
   peers[0].emit('error', { type: 'unavailable-id', message: 'ID is taken' });
   check('a taken id is reported, not swallowed',
     calls.some(c => c[0] === 'error' && c[2] === 'unavailable-id'));
 
-  await sleep(1500);
-  check('it retried instead of giving up', peers.length === 2);
-  peers[1].emit('error', { type: 'unavailable-id', message: 'ID is taken' });
-  await sleep(2500);
-  peers[2].emit('error', { type: 'unavailable-id', message: 'ID is taken' });
-  await sleep(4000);
-  check('falls back to a random id', peers.length === 4 && peers[3].requestedId === null);
+  peers[1].ready();
+  const first = calls.filter(c => c[0] === 'online').pop();
+  check('the backup id keeps the vehicle callable',
+    first && first[1] === 'UP16AB1234' && first[2] === peers[1].id);
 
-  peers[3].ready();
-  const online = calls.filter(c => c[0] === 'online').pop();
-  check('the working peer id is reported to the app',
-    online && online[1] === 'UP16AB1234' && online[2] === peers[3].id);
+  await sleep(1500);
+  check('the plate is retried instead of given up', peers.length === 3);
+  peers[2].ready();
+  const preferred = calls.filter(c => c[0] === 'online').pop();
+  check('once the plate is free it becomes the published id', preferred[2] === 'UP16AB1234');
 
   /* ---------------------------------------------------------- incoming call */
   const sent = [];
@@ -99,13 +99,14 @@ function build() {
     send: msg => sent.push(msg),
     close() {}
   };
-  peers[3].emit('connection', conn);
+  const host = peers[2];
+  host.emit('connection', conn);
   connHandlers.open();
   check('caller handshake answered', sent.some(m => m.t === 'here'));
 
   const callHandlers = {};
   let answered = null;
-  peers[3].emit('call', {
+  host.emit('call', {
     on: (e, cb) => { callHandlers[e] = cb; },
     answer: stream => { answered = stream; },
     close() {}
@@ -127,7 +128,7 @@ function build() {
 
   /* ---------------------------------------------------------- network hiccup */
   const before = peers.length;
-  peers[3].emit('error', { type: 'network', message: 'lost' });
+  host.emit('error', { type: 'network', message: 'lost' });
   await sleep(1500);
   check('a network error triggers a reconnect', peers.length > before);
 

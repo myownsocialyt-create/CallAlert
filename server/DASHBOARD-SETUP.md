@@ -150,6 +150,12 @@ The worker code changes when the app changes. To update: **Workers & Pages -> ve
 Edit code -> Ctrl+A -> Delete -> paste `server/worker/worker.paste.js` -> Deploy.** Bindings and
 secrets are kept, so `/diag` should still answer `"ok": true` afterwards.
 
+### The app can check all of this for you
+
+Open the app -> **My Garage** -> **Run connection test**. It checks this phone, the worker and
+the call page and says in plain words which piece is out of date. "Copy result" puts the whole
+report on the clipboard so it can be pasted into a message.
+
 ### After everything is green
 
 1. Upload [`server/website/index.html`](website/index.html) over the call site's `index.html`

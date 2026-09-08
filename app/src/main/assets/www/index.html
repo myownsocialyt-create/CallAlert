@@ -87,6 +87,13 @@
     <div id="vehicleList"></div>
 
     <div class="card">
+      <h2 class="card-title">Is my vehicle reachable?</h2>
+      <p class="small muted">Runs a full check of this phone, the wake-up server and the call page,
+        and tells you in plain words what to fix if a call cannot get through.</p>
+      <button class="btn btn-primary btn-full" id="selfTestBtn">Run connection test</button>
+    </div>
+
+    <div class="card">
       <h2 class="card-title">Recent calls <button class="btn btn-ghost btn-sm" data-section="logs">View all</button></h2>
       <div id="homeLogs"></div>
     </div>
@@ -137,6 +144,7 @@
     <div class="card">
       <h2 class="card-title">Always-online checklist</h2>
       <div id="envList"></div>
+      <button class="btn btn-ghost btn-full mt8" id="selfTestBtn2">Run connection test</button>
     </div>
 
     <div class="card">
@@ -262,6 +270,22 @@
       <button class="btn btn-ghost" id="cardPrintBtn">Print</button>
     </div>
     <p class="small muted mt8">Print the card and place it on your dashboard so it is visible through the windshield.</p>
+  </div>
+</div>
+
+<!-- ================= CONNECTION TEST MODAL ================= -->
+<div class="modal" id="testModal" role="dialog" aria-modal="true" aria-labelledby="testTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="testTitle">Connection test</h3>
+      <button class="btn btn-ghost btn-sm" data-close-modal="testModal" aria-label="Close">Close</button>
+    </div>
+    <div id="testList"></div>
+    <p class="small muted mt8" id="testHint"></p>
+    <div class="grid-2 mt8">
+      <button class="btn btn-primary" id="testAgainBtn">Test again</button>
+      <button class="btn btn-ghost" id="testCopyBtn">Copy result</button>
+    </div>
   </div>
 </div>
 

@@ -555,6 +555,169 @@
     }).join('');
   }
 
+
+  /* ------------------------------------------------------------------ connection test */
+
+  var lastTestText = '';
+
+  function testRow(level, title, detail) {
+    return { level: level, title: title, detail: detail };
+  }
+
+  function fetchJson(url, timeoutMs) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(null); } }, timeoutMs || 8000);
+      fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (data) {
+        if (!done) { done = true; clearTimeout(timer); resolve(data); }
+      }).catch(function () {
+        if (!done) { done = true; clearTimeout(timer); resolve(null); }
+      });
+    });
+  }
+
+  function fetchText(url, timeoutMs) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(''); } }, timeoutMs || 8000);
+      fetch(url, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (text) {
+        if (!done) { done = true; clearTimeout(timer); resolve(text); }
+      }).catch(function () {
+        if (!done) { done = true; clearTimeout(timer); resolve(''); }
+      });
+    });
+  }
+
+  function renderTest(rows, hint) {
+    var icons = { ok: '✔', warn: '!', bad: '✕', wait: '…' };
+    $('testList').innerHTML = rows.map(function (row) {
+      return '' +
+        '<div class="log-row">' +
+          '<div class="log-main">' +
+            '<div class="log-title">' + icons[row.level] + '  ' + escapeHtml(row.title) + '</div>' +
+            '<div class="log-sub">' + escapeHtml(row.detail) + '</div>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+    $('testHint').textContent = hint || '';
+    lastTestText = rows.map(function (row) {
+      return icons[row.level] + ' ' + row.title + ': ' + row.detail;
+    }).join('\n') + (hint ? '\n\n' + hint : '');
+  }
+
+  async function runSelfTest() {
+    openModal('testModal');
+    renderTest([testRow('wait', 'Checking…', 'Talking to the wake-up server and the call page')], '');
+
+    loadState();
+    var env = state.env || {};
+    var rows = [];
+    var todo = [];
+
+    rows.push(navigator.onLine
+      ? testRow('ok', 'Internet', 'This phone is online')
+      : testRow('bad', 'Internet', 'This phone has no internet connection'));
+
+    if (bridge) {
+      rows.push(env.mic
+        ? testRow('ok', 'Microphone permission', 'Allowed')
+        : testRow('bad', 'Microphone permission', 'Not allowed — calls cannot carry your voice'));
+      rows.push(env.notifications
+        ? testRow('ok', 'Notification permission', 'Allowed')
+        : testRow('bad', 'Notification permission', 'Not allowed — incoming calls cannot be shown'));
+    }
+
+    var online = state.online || [];
+    var plate = online[0] || '';
+    if (!plate) {
+      rows.push(testRow('bad', 'Vehicle switched on', 'No vehicle is Active — tap Active on a vehicle first'));
+      renderTest(rows, 'Switch a vehicle to Active, then run the test again.');
+      return;
+    }
+    rows.push(testRow('ok', 'Vehicle switched on', plate + ' is set to Active'));
+
+    // 1. this phone's own signalling connection
+    var link = (state.link || {})[plate] || {};
+    if (link.peer) {
+      rows.push(testRow('ok', 'Call connection on this phone',
+        'Listening as ' + link.peer));
+    } else if (link.err) {
+      rows.push(testRow('warn', 'Call connection on this phone',
+        (LINK_ERRORS[link.err] || link.err) + ' — reconnecting automatically'));
+    } else {
+      rows.push(testRow('warn', 'Call connection on this phone',
+        'Sleeping — it connects when a call arrives (open this screen for a few seconds and test again)'));
+    }
+
+    // 2. the wake-up server
+    var server = (state.settings.server || '').replace(/\/+$/, '');
+    if (!server) {
+      rows.push(testRow('warn', 'Wake-up server', 'Not set — the app stays connected in the background instead'));
+    } else {
+      var health = await fetchJson(server + '/health');
+      if (!health || !health.ok) {
+        rows.push(testRow('bad', 'Wake-up server', 'No answer from ' + server));
+        todo.push('The wake-up server does not answer. Check the address in Settings.');
+      } else {
+        rows.push(testRow('ok', 'Wake-up server', 'Answering at ' + server));
+
+        var st = await fetchJson(server + '/status?plate=' + encodeURIComponent(plate));
+        if (!st) {
+          rows.push(testRow('bad', 'Vehicle known to the server', 'The server did not answer'));
+        } else if (!st.reachable) {
+          rows.push(testRow('bad', 'Vehicle known to the server',
+            plate + ' is not registered — switch the vehicle off and on again'));
+        } else if (typeof st.awake === 'undefined') {
+          rows.push(testRow('bad', 'Server software version',
+            'The worker is running the OLD code and cannot tell callers where to ring'));
+          todo.push('Update the Cloudflare worker: paste server/worker/worker.paste.js and press Deploy.');
+        } else if (st.awake && st.peerId) {
+          rows.push(testRow('ok', 'Callers can find this phone',
+            'The server hands out id ' + st.peerId));
+        } else {
+          rows.push(testRow('warn', 'Callers can find this phone',
+            'Registered, and it will be woken by a push when someone calls'));
+        }
+      }
+    }
+
+    // 3. the public call page
+    var link0 = (state.settings.link || DEFAULT_LINK).trim();
+    var page = await fetchText(link0);
+    if (!page) {
+      rows.push(testRow('warn', 'Call page', 'Could not be checked from the app'));
+    } else if (page.indexOf('RING_WINDOW_MS') >= 0) {
+      rows.push(testRow('ok', 'Call page', 'Up to date'));
+    } else if (page.indexOf('WAKE_SERVER') >= 0) {
+      rows.push(testRow('bad', 'Call page',
+        'Running the OLD code — it hangs up while you are picking up'));
+      todo.push('Upload server/website/index.html to the call page again.');
+    } else {
+      rows.push(testRow('bad', 'Call page',
+        'This page does not know about the wake-up server at all'));
+      todo.push('Upload server/website/index.html to the call page.');
+    }
+
+    var bad = rows.filter(function (r) { return r.level === 'bad'; }).length;
+    var hint = bad === 0
+      ? 'Everything checks out. Lock the phone and call from another device to confirm.'
+      : todo.join('  ');
+    renderTest(rows, hint);
+  }
+
+  function copyTestResult() {
+    if (!lastTestText) { return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastTestText).then(function () {
+        toast('Result copied');
+      }).catch(function () {
+        if (bridge && bridge.shareText) { bridge.shareText(lastTestText); }
+      });
+      return;
+    }
+    if (bridge && bridge.shareText) { bridge.shareText(lastTestText); }
+  }
+
   /* ------------------------------------------------------------------ native hooks */
 
   window.applyNativeInsets = function (top, bottom) {
@@ -564,6 +727,7 @@
   };
 
   window.onNativeBack = function () {
+    if ($('testModal').classList.contains('open')) { closeModal('testModal'); return true; }
     if ($('qrModal').classList.contains('open')) { closeModal('qrModal'); return true; }
     if ($('cardModal').classList.contains('open')) { closeModal('cardModal'); return true; }
     if ($('drawer').classList.contains('open')) { setDrawer(false); return true; }
@@ -611,6 +775,10 @@
     });
 
     $('addVehicleBtn').addEventListener('click', addVehicle);
+    $('selfTestBtn').addEventListener('click', runSelfTest);
+    $('selfTestBtn2').addEventListener('click', runSelfTest);
+    $('testAgainBtn').addEventListener('click', runSelfTest);
+    $('testCopyBtn').addEventListener('click', copyTestResult);
 
     $('vehicleList').addEventListener('click', function (event) {
       var btn = event.target.closest('[data-act]');
