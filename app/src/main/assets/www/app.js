@@ -9,6 +9,7 @@
   'use strict';
 
   var DEFAULT_LINK = 'https://datashield-cloud.github.io/Temp-call/';
+  var DEFAULT_SERVER = 'https://vehicle-alert.techeditz8.workers.dev';
   var LS_KEY = 'vca_web_state';
 
   var bridge = window.AndroidBridge || null;
@@ -78,7 +79,7 @@
       : { app: !!bridge, mic: false, notifications: false, batteryUnrestricted: false };
     if (!state.settings.link) { state.settings.link = DEFAULT_LINK; }
     if (!state.settings.theme) { state.settings.theme = 'system'; }
-    if (typeof state.settings.server !== 'string') { state.settings.server = ''; }
+    if (typeof state.settings.server !== 'string') { state.settings.server = DEFAULT_SERVER; }
   }
 
   function loadState() {

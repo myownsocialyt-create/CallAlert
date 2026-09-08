@@ -47,13 +47,13 @@ npx wrangler kv namespace create TOKENS
 npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
 
 npx wrangler deploy
-#   → https://vehicle-call-alert-wake.<your-subdomain>.workers.dev
+#   → https://vehicle-alert.techeditz8.workers.dev
 ```
 
 Check it:
 
 ```bash
-curl https://vehicle-call-alert-wake.<your-subdomain>.workers.dev/health
+curl https://vehicle-alert.techeditz8.workers.dev/health
 # {"ok":true,"service":"vehicle-call-alert-wake"}
 ```
 
@@ -72,7 +72,7 @@ connection — from that moment there is no permanent notification.
 Open it, put your Worker URL in the one config line at the top of the script…
 
 ```js
-const WAKE_SERVER = 'https://vehicle-call-alert-wake.<your-subdomain>.workers.dev';
+const WAKE_SERVER = 'https://vehicle-alert.techeditz8.workers.dev';
 ```
 
 …and upload it over the `index.html` of the call site (`datashield-cloud/Temp-call`). It keeps
@@ -93,7 +93,7 @@ Copy `server/website/wake.js` next to your `index.html` and load it **before** y
 Set the server URL once, at the top of your script:
 
 ```js
-VCAWake.serverUrl = 'https://vehicle-call-alert-wake.<your-subdomain>.workers.dev';
+VCAWake.serverUrl = 'https://vehicle-alert.techeditz8.workers.dev';
 ```
 
 Then replace the direct `peer.call(...)` with the wake-up version:

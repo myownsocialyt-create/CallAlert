@@ -61,7 +61,7 @@ credit card. Firebase stays on the free Spark plan.
 At this point the worker page shows its address, something like:
 
 ```
-https://vehicle-call-alert-wake.yourname.workers.dev
+https://vehicle-alert.techeditz8.workers.dev
 ```
 
 **That is the Worker URL I need.**
@@ -91,7 +91,7 @@ The worker remembers "plate → phone" in a Cloudflare KV store.
 Open the **self-check** page in your browser (your address + `/diag`):
 
 ```
-https://vehicle-call-alert-wake.yourname.workers.dev/diag
+https://vehicle-alert.techeditz8.workers.dev/diag
 ```
 
 ```json
@@ -109,7 +109,7 @@ That is normal — the worker only answers on `/health`, `/diag`, `/status`, `/r
 Open this in your browser (your own address + `/health`):
 
 ```
-https://vehicle-call-alert-wake.yourname.workers.dev/health
+https://vehicle-alert.techeditz8.workers.dev/health
 ```
 
 You should see:

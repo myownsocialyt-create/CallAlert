@@ -12,7 +12,8 @@ const { JSDOM } = require('jsdom');
 
 const PAGE = path.resolve(__dirname, '../../server/website/index.html');
 const WAKE = 'https://wake.test';
-const html = fs.readFileSync(PAGE, 'utf8').replace("const WAKE_SERVER = '';", `const WAKE_SERVER = '${WAKE}';`);
+const html = fs.readFileSync(PAGE, 'utf8')
+  .replace(/const WAKE_SERVER = '[^']*';/, `const WAKE_SERVER = '${WAKE}';`);
 
 const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/?car_id=up16ab1234' });
 const { window } = dom;

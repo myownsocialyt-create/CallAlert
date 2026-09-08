@@ -25,6 +25,12 @@ public final class Prefs {
     private static final String K_PUSH_PLATES = "push_plates";
     private static final int MAX_LOGS = 100;
 
+    /**
+     * Wake-up server used when the user has not entered one. Saving an empty value in the
+     * settings screen switches instant wake-up off and falls back to the foreground service.
+     */
+    public static final String DEFAULT_SERVER = "https://vehicle-alert.techeditz8.workers.dev";
+
     private Prefs() {
     }
 
@@ -129,7 +135,7 @@ public final class Prefs {
 
     /** Wake-up server that turns a scanned QR code into a push message. */
     public static String getServerUrl(Context context) {
-        String url = getSettings(context).optString("server", "").trim();
+        String url = getSettings(context).optString("server", DEFAULT_SERVER).trim();
         if (url.endsWith("/")) {
             url = url.substring(0, url.length() - 1);
         }
